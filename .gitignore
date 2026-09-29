@@ -1,0 +1,41 @@
+# Spring Boot & Maven Git Ignore Rule Set
+
+# Maven build target directory
+target/
+*.jar
+*.war
+*.ear
+*.rar
+
+# Maven wrapper / local directory
+.mvn/timing.properties
+.mvn/wrapper/maven-wrapper.jar
+
+# Eclipse project files
+.classpath
+.project
+.settings/
+
+# IntelliJ IDEA project files
+.idea/
+*.iml
+*.iws
+*.ipr
+out/
+
+# Log files & databases
+*.log
+*.sqlite
+*.h2.db
+
+# OS / System files
+.DS_Store
+Thumbs.db
+
+# Environment & local config files
+.env
+application-local.properties
+application-dev.properties
+
+# Antigravity temporary directories
+.gemini/
