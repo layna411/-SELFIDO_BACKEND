@@ -8,6 +8,7 @@ import java.util.Optional;
 
 @Repository
 public interface TherapySessionRepository extends JpaRepository<TherapySession, Long> {
+    List<TherapySession> findByChildId(Long childId);
     List<TherapySession> findByChildIdOrderByStartTimeDesc(Long childId);
     Optional<TherapySession> findBySessionCode(String sessionCode);
     List<TherapySession> findByChildIdAndActivityIdOrderByStartTimeDesc(Long childId, Long activityId);

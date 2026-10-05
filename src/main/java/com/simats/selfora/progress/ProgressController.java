@@ -19,4 +19,11 @@ public class ProgressController {
             @RequestParam(defaultValue = "1") Long activityId) {
         return ResponseEntity.ok(progressAnalyticsService.getProgressSummary(childId, activityId));
     }
+
+    @GetMapping("/{childId}/analyze-adapt")
+    public ResponseEntity<ProgressDtos.AnalyzeAndAdaptDashboardResponse> getAnalyzeAndAdaptDashboard(
+            @PathVariable Long childId,
+            @RequestParam(defaultValue = "1") Long activityId) {
+        return ResponseEntity.ok(progressAnalyticsService.getAnalyzeAndAdaptDashboard(childId, activityId));
+    }
 }

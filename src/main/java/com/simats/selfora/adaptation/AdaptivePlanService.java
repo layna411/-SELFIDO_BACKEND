@@ -1,6 +1,7 @@
 package com.simats.selfora.adaptation;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.simats.selfora.child.ChildService;
 import com.simats.selfora.dto.AdaptivePlanDtos;
 import com.simats.selfora.entity.*;
 import com.simats.selfora.exception.ResourceNotFoundException;
@@ -33,9 +34,14 @@ public class AdaptivePlanService {
     @Autowired
     private UserRepository userRepository;
 
+    @Autowired
+    private ChildService childService;
+
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     public AdaptivePlanDtos.AdaptivePlanResponse createOrConfirmAdaptivePlan(AdaptivePlanDtos.CreateAdaptivePlanRequest request) {
+        childService.validateChildAccessForCurrentUser(request.getChildId());
+
         String username = SecurityContextHolder.getContext().getAuthentication().getName();
         User therapist = userRepository.findByUsername(username)
                 .orElseThrow(() -> new ResourceNotFoundException("Therapist user not found"));
@@ -46,8 +52,10 @@ public class AdaptivePlanService {
         Activity activity = activityRepository.findById(request.getActivityId())
                 .orElseThrow(() -> new ResourceNotFoundException("Activity not found"));
 
-        TherapySession session = therapySessionRepository.findById(request.getSessionId())
-                .orElseThrow(() -> new ResourceNotFoundException("Session not found"));
+        TherapySession session = null;
+        if (request.getSessionId() != null) {
+            session = therapySessionRepository.findById(request.getSessionId()).orElse(null);
+        }
 
         PromptLevel currentPrompt = promptLevelRepository.findById(request.getCurrentPromptLevelId())
                 .orElseThrow(() -> new ResourceNotFoundException("Current prompt level not found"));
@@ -78,10 +86,31 @@ public class AdaptivePlanService {
         return mapToResponse(saved);
     }
 
+    public AdaptivePlanDtos.AdaptivePlanResponse approveAdaptivePlan(Long id) {
+        AdaptivePlan plan = adaptivePlanRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Adaptive plan not found with ID: " + id));
+
+        childService.validateChildAccessForCurrentUser(plan.getChild().getId());
+
+        plan.setIsConfirmed(true);
+        AdaptivePlan saved = adaptivePlanRepository.save(plan);
+        return mapToResponse(saved);
+    }
+
     public AdaptivePlanDtos.AdaptivePlanResponse getLatestAdaptivePlan(Long childId, Long activityId) {
+        childService.validateChildAccessForCurrentUser(childId);
+
         AdaptivePlan plan = adaptivePlanRepository.findTopByChildIdAndActivityIdOrderByCreatedAtDesc(childId, activityId)
                 .orElseThrow(() -> new ResourceNotFoundException("No adaptive plan found for child " + childId));
         return mapToResponse(plan);
+    }
+
+    public List<AdaptivePlanDtos.AdaptivePlanResponse> getAllPlansForChild(Long childId) {
+        childService.validateChildAccessForCurrentUser(childId);
+
+        return adaptivePlanRepository.findByChildIdOrderByCreatedAtDesc(childId).stream()
+                .map(this::mapToResponse)
+                .collect(Collectors.toList());
     }
 
     private AdaptivePlanDtos.AdaptivePlanResponse mapToResponse(AdaptivePlan p) {
@@ -91,13 +120,15 @@ public class AdaptivePlanService {
             stepIds = Arrays.asList(arr);
         } catch (Exception ignored) {}
 
+        Long sessionId = p.getSession() != null ? p.getSession().getId() : null;
+
         return AdaptivePlanDtos.AdaptivePlanResponse.builder()
                 .id(p.getId())
                 .childId(p.getChild().getId())
                 .childName(p.getChild().getFirstName() + " " + p.getChild().getLastName())
                 .activityId(p.getActivity().getId())
                 .activityTitle(p.getActivity().getTitle())
-                .sessionId(p.getSession().getId())
+                .sessionId(sessionId)
                 .currentPromptLevelId(p.getCurrentPromptLevel().getId())
                 .currentPromptLevelName(p.getCurrentPromptLevel().getLevelName())
                 .targetPromptLevelId(p.getTargetPromptLevel().getId())

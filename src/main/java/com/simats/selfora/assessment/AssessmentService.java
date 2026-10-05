@@ -19,6 +19,9 @@ public class AssessmentService {
     private AssessmentRepository assessmentRepository;
 
     @Autowired
+    private UserRepository userRepository;
+
+    @Autowired
     private AssessmentResultRepository assessmentResultRepository;
 
     @Autowired
@@ -34,13 +37,15 @@ public class AssessmentService {
     private PromptLevelRepository promptLevelRepository;
 
     @Autowired
-    private UserRepository userRepository;
+    private com.simats.selfora.child.ChildService childService;
 
     @Transactional
     public AssessmentDtos.AssessmentResponse createAssessment(AssessmentDtos.CreateAssessmentRequest request) {
         String username = SecurityContextHolder.getContext().getAuthentication().getName();
         User therapist = userRepository.findByUsername(username)
                 .orElseThrow(() -> new ResourceNotFoundException("Therapist user not found"));
+
+        childService.validateChildAccessForCurrentUser(request.getChildId());
 
         Child child = childRepository.findById(request.getChildId())
                 .orElseThrow(() -> new ResourceNotFoundException("Child not found"));
@@ -60,14 +65,17 @@ public class AssessmentService {
         List<AssessmentResult> results = request.getStepResults().stream().map(stepReq -> {
             TaskStep step = taskStepRepository.findById(stepReq.getStepId())
                     .orElseThrow(() -> new ResourceNotFoundException("Task step not found: " + stepReq.getStepId()));
-            PromptLevel promptLevel = promptLevelRepository.findById(stepReq.getPromptLevelId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Prompt level not found: " + stepReq.getPromptLevelId()));
+            
+            Integer levelId = stepReq.getPromptLevelId() != null ? stepReq.getPromptLevelId() : 0;
+            PromptLevel promptLevel = promptLevelRepository.findById(levelId)
+                    .orElseGet(() -> promptLevelRepository.findByLevelCode("INDEPENDENT")
+                    .orElseGet(() -> promptLevelRepository.save(PromptLevel.builder().id(0).levelCode("INDEPENDENT").levelName("Independent").hierarchyOrder(0).build())));
 
             return AssessmentResult.builder()
                     .assessment(savedAssessment)
                     .step(step)
                     .baselinePromptLevel(promptLevel)
-                    .outcome(stepReq.getOutcome() != null ? stepReq.getOutcome() : "SUCCESS")
+                    .outcome(stepReq.getOutcome() != null ? stepReq.getOutcome() : "COMPLETED")
                     .notes(stepReq.getNotes())
                     .build();
         }).collect(Collectors.toList());

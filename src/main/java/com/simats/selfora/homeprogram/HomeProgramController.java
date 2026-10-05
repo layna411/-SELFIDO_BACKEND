@@ -22,13 +22,25 @@ public class HomeProgramController {
         return ResponseEntity.ok(homeProgramService.createHomeProgram(request));
     }
 
+    @PutMapping("/{id}/status")
+    @PreAuthorize("hasRole('THERAPIST')")
+    public ResponseEntity<HomeProgramDtos.HomeProgramResponse> updateProgramStatus(
+            @PathVariable Long id,
+            @RequestParam String status) {
+        return ResponseEntity.ok(homeProgramService.updateProgramStatus(id, status));
+    }
+
     @GetMapping("/child/{childId}")
     public ResponseEntity<HomeProgramDtos.HomeProgramResponse> getActiveHomeProgramForChild(@PathVariable Long childId) {
         return ResponseEntity.ok(homeProgramService.getActiveHomeProgramForChild(childId));
     }
 
+    @GetMapping("/child/{childId}/all")
+    public ResponseEntity<List<HomeProgramDtos.HomeProgramResponse>> getAllHomeProgramsForChild(@PathVariable Long childId) {
+        return ResponseEntity.ok(homeProgramService.getAllHomeProgramsForChild(childId));
+    }
+
     @GetMapping("/today")
-    @PreAuthorize("hasRole('CAREGIVER')")
     public ResponseEntity<List<HomeProgramDtos.HomeProgramResponse>> getTodayHomePrograms() {
         return ResponseEntity.ok(homeProgramService.getHomeProgramsForCaregiver());
     }

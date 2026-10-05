@@ -9,5 +9,6 @@ import java.util.Optional;
 @Repository
 public interface AssessmentRepository extends JpaRepository<Assessment, Long> {
     List<Assessment> findByChildId(Long childId);
+    List<Assessment> findByChildIdOrderByAssessmentDateDesc(Long childId);
     Optional<Assessment> findTopByChildIdAndActivityIdOrderByAssessmentDateDesc(Long childId, Long activityId);
 }

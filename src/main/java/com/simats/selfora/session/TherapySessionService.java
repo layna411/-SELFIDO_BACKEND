@@ -20,6 +20,9 @@ public class TherapySessionService {
     private TherapySessionRepository sessionRepository;
 
     @Autowired
+    private UserRepository userRepository;
+
+    @Autowired
     private PerformanceRecordRepository performanceRecordRepository;
 
     @Autowired
@@ -38,13 +41,15 @@ public class TherapySessionService {
     private PromptLevelRepository promptLevelRepository;
 
     @Autowired
-    private UserRepository userRepository;
+    private com.simats.selfora.child.ChildService childService;
 
     @Transactional
     public SessionDtos.SessionResponse startSession(SessionDtos.StartSessionRequest request) {
         String username = SecurityContextHolder.getContext().getAuthentication().getName();
         User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
+        childService.validateChildAccessForCurrentUser(request.getChildId());
 
         Child child = childRepository.findById(request.getChildId())
                 .orElseThrow(() -> new ResourceNotFoundException("Child not found"));
@@ -72,11 +77,15 @@ public class TherapySessionService {
         TherapySession session = sessionRepository.findById(sessionId)
                 .orElseThrow(() -> new ResourceNotFoundException("Session not found with ID: " + sessionId));
 
+        childService.validateChildAccessForCurrentUser(session.getChild().getId());
+
         TaskStep step = taskStepRepository.findById(request.getStepId())
                 .orElseThrow(() -> new ResourceNotFoundException("Step not found with ID: " + request.getStepId()));
 
-        PromptLevel promptLevel = promptLevelRepository.findById(request.getPromptLevelId())
-                .orElseThrow(() -> new ResourceNotFoundException("Prompt level not found with ID: " + request.getPromptLevelId()));
+        Integer levelId = request.getPromptLevelId() != null ? request.getPromptLevelId() : 0;
+        PromptLevel promptLevel = promptLevelRepository.findById(levelId)
+                .orElseGet(() -> promptLevelRepository.findByLevelCode("INDEPENDENT")
+                .orElseGet(() -> promptLevelRepository.save(PromptLevel.builder().id(0).levelCode("INDEPENDENT").levelName("Independent").hierarchyOrder(0).build())));
 
         PerformanceRecord record = PerformanceRecord.builder()
                 .session(session)
@@ -107,6 +116,8 @@ public class TherapySessionService {
         TherapySession session = sessionRepository.findById(sessionId)
                 .orElseThrow(() -> new ResourceNotFoundException("Session not found with ID: " + sessionId));
 
+        childService.validateChildAccessForCurrentUser(session.getChild().getId());
+
         session.setEndTime(LocalDateTime.now());
         if (session.getStartTime() != null) {
             long duration = java.time.Duration.between(session.getStartTime(), session.getEndTime()).getSeconds();
@@ -122,8 +133,9 @@ public class TherapySessionService {
         int independentSteps = (int) records.stream().filter(r -> r.getPromptLevel().getId() == 0 && "COMPLETED".equalsIgnoreCase(r.getOutcome())).count();
         int promptedSteps = (int) records.stream().filter(r -> r.getPromptLevel().getId() > 0 && "COMPLETED".equalsIgnoreCase(r.getOutcome())).count();
         int unableSteps = (int) records.stream().filter(r -> "UNABLE".equalsIgnoreCase(r.getOutcome())).count();
+        int totalAssessedSteps = (int) records.stream().filter(r -> !"NOT_ASSESSED".equalsIgnoreCase(r.getOutcome())).count();
 
-        double independencePct = totalSteps > 0 ? ((double) independentSteps / totalSteps) * 100.0 : 0.0;
+        double independencePct = totalAssessedSteps > 0 ? ((double) independentSteps / totalAssessedSteps) * 100.0 : 0.0;
 
         Map<String, Integer> distribution = new HashMap<>();
         for (PerformanceRecord r : records) {

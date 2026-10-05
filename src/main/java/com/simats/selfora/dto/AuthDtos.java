@@ -29,16 +29,18 @@ public class AuthDtos {
         private String username;
         private String fullName;
         private List<String> roles;
+        private Boolean mustChangePassword;
 
         public AuthResponse() {}
 
-        public AuthResponse(String token, String tokenType, Long userId, String username, String fullName, List<String> roles) {
+        public AuthResponse(String token, String tokenType, Long userId, String username, String fullName, List<String> roles, Boolean mustChangePassword) {
             this.token = token;
             this.tokenType = tokenType;
             this.userId = userId;
             this.username = username;
             this.fullName = fullName;
             this.roles = roles;
+            this.mustChangePassword = mustChangePassword;
         }
 
         public static Builder builder() { return new Builder(); }
@@ -50,6 +52,7 @@ public class AuthDtos {
             private String username;
             private String fullName;
             private List<String> roles;
+            private Boolean mustChangePassword;
 
             public Builder token(String token) { this.token = token; return this; }
             public Builder tokenType(String tokenType) { this.tokenType = tokenType; return this; }
@@ -57,7 +60,8 @@ public class AuthDtos {
             public Builder username(String username) { this.username = username; return this; }
             public Builder fullName(String fullName) { this.fullName = fullName; return this; }
             public Builder roles(List<String> roles) { this.roles = roles; return this; }
-            public AuthResponse build() { return new AuthResponse(token, tokenType, userId, username, fullName, roles); }
+            public Builder mustChangePassword(Boolean mustChangePassword) { this.mustChangePassword = mustChangePassword; return this; }
+            public AuthResponse build() { return new AuthResponse(token, tokenType, userId, username, fullName, roles, mustChangePassword); }
         }
 
         public String getToken() { return token; }
@@ -77,5 +81,26 @@ public class AuthDtos {
 
         public List<String> getRoles() { return roles; }
         public void setRoles(List<String> roles) { this.roles = roles; }
+
+        public Boolean getMustChangePassword() { return mustChangePassword; }
+        public void setMustChangePassword(Boolean mustChangePassword) { this.mustChangePassword = mustChangePassword; }
+    }
+
+    public static class ChangePasswordRequest {
+        private String currentPassword;
+        private String newPassword;
+
+        public ChangePasswordRequest() {}
+
+        public ChangePasswordRequest(String currentPassword, String newPassword) {
+            this.currentPassword = currentPassword;
+            this.newPassword = newPassword;
+        }
+
+        public String getCurrentPassword() { return currentPassword; }
+        public void setCurrentPassword(String currentPassword) { this.currentPassword = currentPassword; }
+
+        public String getNewPassword() { return newPassword; }
+        public void setNewPassword(String newPassword) { this.newPassword = newPassword; }
     }
 }

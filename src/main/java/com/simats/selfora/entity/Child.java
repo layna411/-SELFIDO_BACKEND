@@ -96,7 +96,12 @@ public class Child {
         updatedAt = LocalDateTime.now();
     }
 
-    // Getters and Setters
+    @Transient
+    private User caregiver;
+
+    public User getCaregiver() { return caregiver; }
+    public void setCaregiver(User caregiver) { this.caregiver = caregiver; }
+
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
 

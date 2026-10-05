@@ -26,6 +26,11 @@ public class ChildController {
         return ResponseEntity.ok(childService.getChildById(id));
     }
 
+    @GetMapping("/{id}/validate-access")
+    public ResponseEntity<Boolean> validateChildAccess(@PathVariable Long id) {
+        return ResponseEntity.ok(childService.validateChildAccessForCurrentUser(id));
+    }
+
     @PostMapping
     @PreAuthorize("hasRole('THERAPIST')")
     public ResponseEntity<ChildDto> createChild(@RequestBody ChildDto dto) {

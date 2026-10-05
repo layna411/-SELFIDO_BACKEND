@@ -33,6 +33,9 @@ public class User {
     @Column(name = "is_active")
     private Boolean isActive = true;
 
+    @Column(name = "must_change_password")
+    private Boolean mustChangePassword = false;
+
     @ManyToMany(fetch = FetchType.EAGER)
     @JoinTable(
         name = "user_roles",
@@ -49,7 +52,7 @@ public class User {
 
     public User() {}
 
-    public User(Long id, String username, String passwordHash, String fullName, String email, String phone, String profilePhotoUrl, Boolean isActive, Set<Role> roles, LocalDateTime createdAt, LocalDateTime updatedAt) {
+    public User(Long id, String username, String passwordHash, String fullName, String email, String phone, String profilePhotoUrl, Boolean isActive, Boolean mustChangePassword, Set<Role> roles, LocalDateTime createdAt, LocalDateTime updatedAt) {
         this.id = id;
         this.username = username;
         this.passwordHash = passwordHash;
@@ -58,6 +61,7 @@ public class User {
         this.phone = phone;
         this.profilePhotoUrl = profilePhotoUrl;
         this.isActive = isActive != null ? isActive : true;
+        this.mustChangePassword = mustChangePassword != null ? mustChangePassword : false;
         this.roles = roles != null ? roles : new HashSet<>();
         this.createdAt = createdAt;
         this.updatedAt = updatedAt;
@@ -74,6 +78,7 @@ public class User {
         private String phone;
         private String profilePhotoUrl;
         private Boolean isActive = true;
+        private Boolean mustChangePassword = false;
         private Set<Role> roles = new HashSet<>();
         private LocalDateTime createdAt;
         private LocalDateTime updatedAt;
@@ -86,12 +91,13 @@ public class User {
         public Builder phone(String phone) { this.phone = phone; return this; }
         public Builder profilePhotoUrl(String profilePhotoUrl) { this.profilePhotoUrl = profilePhotoUrl; return this; }
         public Builder isActive(Boolean isActive) { this.isActive = isActive; return this; }
+        public Builder mustChangePassword(Boolean mustChangePassword) { this.mustChangePassword = mustChangePassword; return this; }
         public Builder roles(Set<Role> roles) { this.roles = roles; return this; }
         public Builder createdAt(LocalDateTime createdAt) { this.createdAt = createdAt; return this; }
         public Builder updatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; return this; }
 
         public User build() {
-            return new User(id, username, passwordHash, fullName, email, phone, profilePhotoUrl, isActive, roles, createdAt, updatedAt);
+            return new User(id, username, passwordHash, fullName, email, phone, profilePhotoUrl, isActive, mustChangePassword, roles, createdAt, updatedAt);
         }
     }
 
@@ -104,6 +110,18 @@ public class User {
     @PreUpdate
     protected void onUpdate() {
         updatedAt = LocalDateTime.now();
+    }
+
+    public String getFirstName() {
+        if (fullName == null || fullName.trim().isEmpty()) return "";
+        String[] parts = fullName.trim().split("\\s+");
+        return parts[0];
+    }
+
+    public String getLastName() {
+        if (fullName == null || fullName.trim().isEmpty()) return "";
+        String[] parts = fullName.trim().split("\\s+");
+        return parts.length > 1 ? parts[parts.length - 1] : "";
     }
 
     public Long getId() { return id; }
@@ -129,6 +147,9 @@ public class User {
 
     public Boolean getIsActive() { return isActive; }
     public void setIsActive(Boolean isActive) { this.isActive = isActive; }
+
+    public Boolean getMustChangePassword() { return mustChangePassword; }
+    public void setMustChangePassword(Boolean mustChangePassword) { this.mustChangePassword = mustChangePassword; }
 
     public Set<Role> getRoles() { return roles; }
     public void setRoles(Set<Role> roles) { this.roles = roles; }

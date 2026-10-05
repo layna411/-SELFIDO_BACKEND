@@ -25,6 +25,9 @@ public class AuthService {
     @Autowired
     private UserRepository userRepository;
 
+    @Autowired
+    private org.springframework.security.crypto.password.PasswordEncoder passwordEncoder;
+
     public AuthDtos.AuthResponse login(AuthDtos.LoginRequest request) {
         Authentication authentication = authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(request.getUsername(), request.getPassword())
@@ -43,6 +46,21 @@ public class AuthService {
                 .username(user.getUsername())
                 .fullName(user.getFullName())
                 .roles(user.getRoles().stream().map(r -> r.getName()).collect(Collectors.toList()))
+                .mustChangePassword(user.getMustChangePassword())
                 .build();
+    }
+
+    public void changePassword(AuthDtos.ChangePasswordRequest request) {
+        String username = SecurityContextHolder.getContext().getAuthentication().getName();
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        if (request.getNewPassword() == null || request.getNewPassword().length() < 6) {
+            throw new IllegalArgumentException("Password must be at least 6 characters");
+        }
+
+        user.setPasswordHash(passwordEncoder.encode(request.getNewPassword()));
+        user.setMustChangePassword(false);
+        userRepository.save(user);
     }
 }
