@@ -29,15 +29,19 @@ public class AuthService {
     private org.springframework.security.crypto.password.PasswordEncoder passwordEncoder;
 
     public AuthDtos.AuthResponse login(AuthDtos.LoginRequest request) {
+        String cleanInput = request.getUsername() != null ? request.getUsername().trim() : "";
+        String cleanPassword = request.getPassword() != null ? request.getPassword().trim() : "";
+
         Authentication authentication = authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(request.getUsername(), request.getPassword())
+                new UsernamePasswordAuthenticationToken(cleanInput, cleanPassword)
         );
 
         SecurityContextHolder.getContext().setAuthentication(authentication);
         String jwt = tokenProvider.generateToken(authentication);
 
-        User user = userRepository.findByUsername(request.getUsername())
-                .orElseThrow(() -> new RuntimeException("User not found"));
+        User user = userRepository.findByUsernameIgnoreCaseOrEmailIgnoreCase(cleanInput, cleanInput)
+                .orElseGet(() -> userRepository.findByUsernameOrEmail(cleanInput, cleanInput)
+                .orElseThrow(() -> new RuntimeException("User not found")));
 
         return AuthDtos.AuthResponse.builder()
                 .token(jwt)
@@ -46,7 +50,7 @@ public class AuthService {
                 .username(user.getUsername())
                 .fullName(user.getFullName())
                 .roles(user.getRoles().stream().map(r -> r.getName()).collect(Collectors.toList()))
-                .mustChangePassword(user.getMustChangePassword())
+                .mustChangePassword(Boolean.TRUE.equals(user.getMustChangePassword()))
                 .build();
     }
 
