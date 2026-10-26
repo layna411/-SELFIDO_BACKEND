@@ -22,6 +22,9 @@ public class ChildService {
     @Autowired
     private UserRepository userRepository;
 
+    @Autowired
+    private org.springframework.jdbc.core.JdbcTemplate jdbcTemplate;
+
     public List<ChildDto> getAssignedChildrenForCurrentUser() {
         String username = SecurityContextHolder.getContext().getAuthentication().getName();
         User user = userRepository.findByUsername(username)
@@ -54,14 +57,14 @@ public class ChildService {
         User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
-        boolean isAdmin = user.getRoles().stream().anyMatch(r -> r.getName().equals("ROLE_ADMIN"));
+        boolean isAdmin = user.getRoles().stream().anyMatch(r -> r.getName().equals("ROLE_ADMIN") || r.getName().equals("ROLE_SUPER_ADMIN"));
         if (isAdmin) {
             return true;
         }
 
         boolean isTherapist = user.getRoles().stream().anyMatch(r -> r.getName().equals("ROLE_THERAPIST"));
         if (isTherapist) {
-            boolean hasAccess = childRepository.existsByChildIdAndTherapistId(childId, user.getId());
+            boolean hasAccess = childRepository.countByChildIdAndTherapistId(childId, user.getId()) > 0;
             if (!hasAccess) {
                 throw new org.springframework.security.access.AccessDeniedException("Therapist " + username + " is not assigned to child ID: " + childId);
             }
@@ -70,7 +73,7 @@ public class ChildService {
 
         boolean isCaregiver = user.getRoles().stream().anyMatch(r -> r.getName().equals("ROLE_CAREGIVER"));
         if (isCaregiver) {
-            boolean hasAccess = childRepository.existsByChildIdAndCaregiverId(childId, user.getId());
+            boolean hasAccess = childRepository.countByChildIdAndCaregiverId(childId, user.getId()) > 0;
             if (!hasAccess) {
                 throw new org.springframework.security.access.AccessDeniedException("Caregiver " + username + " is not linked to child ID: " + childId);
             }
@@ -96,6 +99,24 @@ public class ChildService {
     }
 
     private ChildDto mapToDto(Child c) {
+        String cgName = "Unassigned";
+        try {
+            List<String> cgNames = jdbcTemplate.queryForList(
+                    "SELECT u.full_name FROM users u JOIN caregiver_children cc ON u.id = cc.caregiver_id WHERE cc.child_id = ? LIMIT 1",
+                    String.class, c.getId()
+            );
+            if (!cgNames.isEmpty() && cgNames.get(0) != null) cgName = cgNames.get(0);
+        } catch (Exception ignored) {}
+
+        String thName = "Unassigned";
+        try {
+            List<String> thNames = jdbcTemplate.queryForList(
+                    "SELECT u.full_name FROM users u JOIN therapist_children tc ON u.id = tc.child_id WHERE tc.child_id = ? LIMIT 1",
+                    String.class, c.getId()
+            );
+            if (!thNames.isEmpty() && thNames.get(0) != null) thName = thNames.get(0);
+        } catch (Exception ignored) {}
+
         return ChildDto.builder()
                 .id(c.getId())
                 .firstName(c.getFirstName())
@@ -105,6 +126,8 @@ public class ChildService {
                 .avatarUrl(c.getAvatarUrl())
                 .diagnosisNotes(c.getDiagnosisNotes())
                 .isActive(c.getIsActive())
+                .caregiverName(cgName)
+                .therapistName(thName)
                 .build();
     }
 }

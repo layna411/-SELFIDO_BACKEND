@@ -4,7 +4,9 @@ import jakarta.persistence.*;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "child_activity_progress")
+@Table(name = "child_activity_progress", uniqueConstraints = {
+    @UniqueConstraint(name = "uk_cap_child_activity", columnNames = {"child_id", "activity_id"})
+})
 public class ChildActivityProgress {
 
     @Id

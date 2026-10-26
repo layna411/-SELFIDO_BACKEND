@@ -6,7 +6,9 @@ import com.simats.selfora.entity.HomeProgram;
 import com.simats.selfora.exception.ResourceNotFoundException;
 import com.simats.selfora.repository.*;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -14,6 +16,7 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Service
+@Transactional
 public class ChildModeService {
 
     @Autowired
@@ -40,6 +43,7 @@ public class ChildModeService {
     @Autowired
     private ChildModePreferenceRepository childModePreferenceRepository;
 
+    @Transactional
     public ChildDashboardResponse getChildDashboard(Long childId) {
         childService.validateChildAccessForCurrentUser(childId);
 
@@ -160,9 +164,33 @@ public class ChildModeService {
         return response;
     }
 
+    @Autowired
+    @org.springframework.context.annotation.Lazy
+    private ChildModeService self;
+
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.REQUIRES_NEW)
+    public void ensureProgressRecordExists(Long childId, Long activityId) {
+        childActivityProgressRepository.insertIgnoreProgress(childId, activityId);
+    }
+
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.REQUIRES_NEW)
+    public void awardBadgeIfEligible(Child child, String type, String title, String icon) {
+        childRewardRepository.insertIgnoreReward(child.getId(), type, title, icon);
+    }
+
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.NOT_SUPPORTED)
     public ChildActivityProgress recordStepProgress(RecordStepProgressRequest request) {
         childService.validateChildAccessForCurrentUser(request.getChildId());
 
+        // Step 1: Ensure row exists in DB via committed micro-transaction BEFORE main transaction snapshot
+        self.ensureProgressRecordExists(request.getChildId(), request.getActivityId());
+
+        // Step 2: Perform update in new transactional snapshot that sees the committed record
+        return self.doUpdateStepProgress(request);
+    }
+
+    @Transactional
+    public ChildActivityProgress doUpdateStepProgress(RecordStepProgressRequest request) {
         Child child = childRepository.findById(request.getChildId())
                 .orElseThrow(() -> new ResourceNotFoundException("Child not found: " + request.getChildId()));
         Activity activity = activityRepository.findById(request.getActivityId())
@@ -170,7 +198,9 @@ public class ChildModeService {
 
         ChildActivityProgress progress = childActivityProgressRepository
                 .findByChildIdAndActivityId(request.getChildId(), request.getActivityId())
-                .orElseGet(() -> new ChildActivityProgress(child, activity, 1, 0, false, 0));
+                .orElseThrow(() -> new ResourceNotFoundException("Progress record missing for child " + request.getChildId()));
+
+        boolean alreadyCompleted = Boolean.TRUE.equals(progress.getIsCompleted());
 
         if (request.getStepNumber() != null) {
             progress.setLastStepNumber(request.getStepNumber());
@@ -181,22 +211,15 @@ public class ChildModeService {
 
         if (Boolean.TRUE.equals(request.getIsActivityCompleted())) {
             progress.setIsCompleted(true);
-            progress.setStarsEarned(progress.getStarsEarned() + 5);
+            if (!alreadyCompleted) {
+                progress.setStarsEarned(5);
 
-            // Award badge if not already awarded
-            awardBadgeIfEligible(child, "COMPLETION_STAR", "Star Performer", "ic_star_gold");
+                // Award badge if not already awarded in isolated transaction
+                self.awardBadgeIfEligible(child, "COMPLETION_STAR", "Star Performer", "ic_star_gold");
+            }
         }
 
-        ChildActivityProgress saved = childActivityProgressRepository.save(progress);
-
-        return saved;
-    }
-
-    private void awardBadgeIfEligible(Child child, String type, String title, String icon) {
-        if (!childRewardRepository.existsByChildIdAndBadgeType(child.getId(), type)) {
-            ChildReward reward = new ChildReward(child, type, title, icon);
-            childRewardRepository.save(reward);
-        }
+        return childActivityProgressRepository.saveAndFlush(progress);
     }
 
     public List<ChildRewardDto> getChildRewards(Long childId) {

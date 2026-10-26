@@ -15,9 +15,9 @@ public interface ChildRepository extends JpaRepository<Child, Long> {
     @Query(value = "SELECT c.* FROM children c JOIN caregiver_children cc ON c.id = cc.child_id WHERE cc.caregiver_id = :caregiverId AND c.is_active = true", nativeQuery = true)
     List<Child> findByCaregiverId(@Param("caregiverId") Long caregiverId);
 
-    @Query(value = "SELECT CASE WHEN COUNT(*) > 0 THEN true ELSE false END FROM therapist_children WHERE child_id = :childId AND therapist_id = :therapistId", nativeQuery = true)
-    boolean existsByChildIdAndTherapistId(@Param("childId") Long childId, @Param("therapistId") Long therapistId);
+    @Query(value = "SELECT COUNT(*) FROM therapist_children WHERE child_id = :childId AND therapist_id = :therapistId", nativeQuery = true)
+    long countByChildIdAndTherapistId(@Param("childId") Long childId, @Param("therapistId") Long therapistId);
 
-    @Query(value = "SELECT CASE WHEN COUNT(*) > 0 THEN true ELSE false END FROM caregiver_children WHERE child_id = :childId AND caregiver_id = :caregiverId", nativeQuery = true)
-    boolean existsByChildIdAndCaregiverId(@Param("childId") Long childId, @Param("caregiverId") Long caregiverId);
+    @Query(value = "SELECT COUNT(*) FROM caregiver_children WHERE child_id = :childId AND caregiver_id = :caregiverId", nativeQuery = true)
+    long countByChildIdAndCaregiverId(@Param("childId") Long childId, @Param("caregiverId") Long caregiverId);
 }

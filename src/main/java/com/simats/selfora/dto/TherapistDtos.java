@@ -10,6 +10,7 @@ public class TherapistDtos {
         // Step 1: Child Info
         private String childFirstName;
         private String childLastName;
+        @com.fasterxml.jackson.annotation.JsonFormat(pattern = "yyyy-MM-dd")
         private LocalDate dateOfBirth;
         private String gender;
         private String profilePhotoUrl;
@@ -411,5 +412,63 @@ public class TherapistDtos {
 
         public String getObservation() { return observation; }
         public void setObservation(String observation) { this.observation = observation; }
+    }
+
+    public static class TherapistCaregiverSummaryItem {
+        private Long id;
+        private String fullName;
+        private String email;
+        private String phone;
+        private Boolean isActive;
+        private String relationship;
+        private Long childId;
+        private String childName;
+        private int activeHomeProgramsCount;
+        private int pendingPracticeReviewsCount;
+
+        public TherapistCaregiverSummaryItem() {}
+
+        public TherapistCaregiverSummaryItem(Long id, String fullName, String email, String phone, Boolean isActive, String relationship, Long childId, String childName, int activeHomeProgramsCount, int pendingPracticeReviewsCount) {
+            this.id = id;
+            this.fullName = fullName;
+            this.email = email;
+            this.phone = phone;
+            this.isActive = isActive;
+            this.relationship = relationship;
+            this.childId = childId;
+            this.childName = childName;
+            this.activeHomeProgramsCount = activeHomeProgramsCount;
+            this.pendingPracticeReviewsCount = pendingPracticeReviewsCount;
+        }
+
+        public Long getId() { return id; }
+        public void setId(Long id) { this.id = id; }
+
+        public String getFullName() { return fullName; }
+        public void setFullName(String fullName) { this.fullName = fullName; }
+
+        public String getEmail() { return email; }
+        public void setEmail(String email) { this.email = email; }
+
+        public String getPhone() { return phone; }
+        public void setPhone(String phone) { this.phone = phone; }
+
+        public Boolean getIsActive() { return isActive; }
+        public void setIsActive(Boolean isActive) { this.isActive = isActive; }
+
+        public String getRelationship() { return relationship; }
+        public void setRelationship(String relationship) { this.relationship = relationship; }
+
+        public Long getChildId() { return childId; }
+        public void setChildId(Long childId) { this.childId = childId; }
+
+        public String getChildName() { return childName; }
+        public void setChildName(String childName) { this.childName = childName; }
+
+        public int getActiveHomeProgramsCount() { return activeHomeProgramsCount; }
+        public void setActiveHomeProgramsCount(int activeHomeProgramsCount) { this.activeHomeProgramsCount = activeHomeProgramsCount; }
+
+        public int getPendingPracticeReviewsCount() { return pendingPracticeReviewsCount; }
+        public void setPendingPracticeReviewsCount(int pendingPracticeReviewsCount) { this.pendingPracticeReviewsCount = pendingPracticeReviewsCount; }
     }
 }

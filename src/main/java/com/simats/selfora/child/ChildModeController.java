@@ -4,6 +4,7 @@ import com.simats.selfora.dto.ChildModeDtos.*;
 import com.simats.selfora.entity.ChildActivityProgress;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -11,6 +12,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/child-mode")
 @CrossOrigin(origins = "*")
+@PreAuthorize("hasAnyRole('CAREGIVER', 'THERAPIST', 'SUPER_ADMIN', 'ADMIN') || hasAnyAuthority('ROLE_CAREGIVER', 'ROLE_THERAPIST', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN')")
 public class ChildModeController {
 
     @Autowired

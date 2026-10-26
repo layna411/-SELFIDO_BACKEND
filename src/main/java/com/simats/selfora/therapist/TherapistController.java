@@ -11,7 +11,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/therapist")
 @CrossOrigin(origins = "*")
-@PreAuthorize("hasRole('THERAPIST')")
+@PreAuthorize("hasAnyRole('THERAPIST', 'SUPER_ADMIN', 'ADMIN') || hasAnyAuthority('ROLE_THERAPIST', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN')")
 public class TherapistController {
 
     @Autowired
@@ -33,6 +33,21 @@ public class TherapistController {
             @RequestParam(required = false) String search
     ) {
         return ResponseEntity.ok(therapistService.getChildren(filter, search));
+    }
+
+    @GetMapping("/caregivers")
+    public ResponseEntity<List<TherapistCaregiverSummaryItem>> getCaregivers() {
+        return ResponseEntity.ok(therapistService.getCaregivers());
+    }
+
+    @PostMapping("/children/{childId}/link-caregiver")
+    public ResponseEntity<Void> linkCaregiverToChild(
+            @PathVariable Long childId,
+            @RequestParam Long caregiverId,
+            @RequestParam(required = false, defaultValue = "Parent") String relationship
+    ) {
+        therapistService.linkCaregiverToChild(childId, caregiverId, relationship);
+        return ResponseEntity.ok().build();
     }
 
     @PostMapping("/caregivers/{caregiverId}/reset-password")

@@ -13,4 +13,5 @@ public interface CaregiverPracticeSessionRepository extends JpaRepository<Caregi
     List<CaregiverPracticeSession> findByStatusOrderBySubmittedAtDesc(String status);
     List<CaregiverPracticeSession> findByChildIdAndStatus(Long childId, String status);
     boolean existsByChildIdAndHomeProgramIdAndPracticeDate(Long childId, Long homeProgramId, java.time.LocalDate practiceDate);
+    java.util.Optional<CaregiverPracticeSession> findByClientSessionId(String clientSessionId);
 }

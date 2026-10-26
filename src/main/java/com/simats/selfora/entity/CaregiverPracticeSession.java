@@ -11,6 +11,9 @@ public class CaregiverPracticeSession {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Column(name = "client_session_id", length = 100)
+    private String clientSessionId;
+
     @ManyToOne
     @JoinColumn(name = "child_id", nullable = false)
     private Child child;
@@ -60,8 +63,9 @@ public class CaregiverPracticeSession {
 
     public CaregiverPracticeSession() {}
 
-    public CaregiverPracticeSession(Long id, Child child, User caregiver, HomeProgram homeProgram, Activity activity, LocalDate practiceDate, Integer durationMinutes, String caregiverNotes, String status, LocalDateTime submittedAt, User reviewingTherapist, LocalDateTime reviewedAt, String therapistFeedback, Boolean flaggedForFollowup, LocalDateTime createdAt) {
+    public CaregiverPracticeSession(Long id, String clientSessionId, Child child, User caregiver, HomeProgram homeProgram, Activity activity, LocalDate practiceDate, Integer durationMinutes, String caregiverNotes, String status, LocalDateTime submittedAt, User reviewingTherapist, LocalDateTime reviewedAt, String therapistFeedback, Boolean flaggedForFollowup, LocalDateTime createdAt) {
         this.id = id;
+        this.clientSessionId = clientSessionId;
         this.child = child;
         this.caregiver = caregiver;
         this.homeProgram = homeProgram;
@@ -82,6 +86,7 @@ public class CaregiverPracticeSession {
 
     public static class Builder {
         private Long id;
+        private String clientSessionId;
         private Child child;
         private User caregiver;
         private HomeProgram homeProgram;
@@ -98,6 +103,7 @@ public class CaregiverPracticeSession {
         private LocalDateTime createdAt;
 
         public Builder id(Long id) { this.id = id; return this; }
+        public Builder clientSessionId(String clientSessionId) { this.clientSessionId = clientSessionId; return this; }
         public Builder child(Child child) { this.child = child; return this; }
         public Builder caregiver(User caregiver) { this.caregiver = caregiver; return this; }
         public Builder homeProgram(HomeProgram homeProgram) { this.homeProgram = homeProgram; return this; }
@@ -114,7 +120,7 @@ public class CaregiverPracticeSession {
         public Builder createdAt(LocalDateTime createdAt) { this.createdAt = createdAt; return this; }
 
         public CaregiverPracticeSession build() {
-            return new CaregiverPracticeSession(id, child, caregiver, homeProgram, activity, practiceDate, durationMinutes, caregiverNotes, status, submittedAt, reviewingTherapist, reviewedAt, therapistFeedback, flaggedForFollowup, createdAt);
+            return new CaregiverPracticeSession(id, clientSessionId, child, caregiver, homeProgram, activity, practiceDate, durationMinutes, caregiverNotes, status, submittedAt, reviewingTherapist, reviewedAt, therapistFeedback, flaggedForFollowup, createdAt);
         }
     }
 
@@ -126,6 +132,9 @@ public class CaregiverPracticeSession {
 
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
+
+    public String getClientSessionId() { return clientSessionId; }
+    public void setClientSessionId(String clientSessionId) { this.clientSessionId = clientSessionId; }
 
     public Child getChild() { return child; }
     public void setChild(Child child) { this.child = child; }

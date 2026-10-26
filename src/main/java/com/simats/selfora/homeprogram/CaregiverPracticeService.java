@@ -12,6 +12,7 @@ import org.springframework.stereotype.Service;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 @Service
@@ -49,6 +50,10 @@ public class CaregiverPracticeService {
         User caregiver = userRepository.findByUsername(username)
                 .orElseThrow(() -> new ResourceNotFoundException("Caregiver user not found"));
 
+        if (request.getChildId() == null || request.getHomeProgramId() == null || request.getActivityId() == null) {
+            throw new IllegalArgumentException("Child ID, Home Program ID, and Activity ID are required");
+        }
+
         childService.validateChildAccessForCurrentUser(request.getChildId());
 
         Child child = childRepository.findById(request.getChildId())
@@ -60,24 +65,45 @@ public class CaregiverPracticeService {
         Activity activity = activityRepository.findById(request.getActivityId())
                 .orElseThrow(() -> new ResourceNotFoundException("Activity not found"));
 
-        // Check for duplicate submission on same date
-        boolean exists = practiceSessionRepository.existsByChildIdAndHomeProgramIdAndPracticeDate(
-                child.getId(), program.getId(), request.getPracticeDate()
-        );
-        if (exists) {
-            // Retrieve existing or update
+        // Validate program belongs to child
+        if (!program.getChild().getId().equals(child.getId())) {
+            throw new org.springframework.security.access.AccessDeniedException(
+                    "Home program ID " + program.getId() + " does not belong to child ID " + child.getId());
+        }
+
+        // Validate activity belongs to program
+        if (program.getActivity() != null && !program.getActivity().getId().equals(activity.getId())) {
+            throw new IllegalArgumentException(
+                    "Activity ID " + activity.getId() + " does not match home program activity ID " + program.getActivity().getId());
+        }
+
+        java.time.LocalDate practiceDate = request.getPracticeDate() != null ? request.getPracticeDate() : java.time.LocalDate.now();
+
+        // 1. Explicit Client Session ID Idempotency Check
+        if (request.getClientSessionId() != null && !request.getClientSessionId().trim().isEmpty()) {
+            java.util.Optional<CaregiverPracticeSession> existingByClient = practiceSessionRepository.findByClientSessionId(request.getClientSessionId().trim());
+            if (existingByClient.isPresent()) {
+                return mapToResponse(existingByClient.get());
+            }
+        } else {
+            // 2. Fallback network retry duplicate submission check (same child, program, practice date & notes)
             List<CaregiverPracticeSession> existingList = practiceSessionRepository.findByChildIdOrderByPracticeDateDesc(child.getId());
-            if (!existingList.isEmpty()) {
-                return mapToResponse(existingList.get(0));
+            for (CaregiverPracticeSession existing : existingList) {
+                if (existing.getHomeProgram() != null && existing.getHomeProgram().getId().equals(program.getId())
+                        && existing.getPracticeDate().equals(practiceDate)
+                        && Objects.equals(existing.getCaregiverNotes(), request.getCaregiverNotes())) {
+                    return mapToResponse(existing);
+                }
             }
         }
 
         CaregiverPracticeSession session = CaregiverPracticeSession.builder()
+                .clientSessionId(request.getClientSessionId() != null ? request.getClientSessionId().trim() : null)
                 .child(child)
                 .caregiver(caregiver)
                 .homeProgram(program)
                 .activity(activity)
-                .practiceDate(request.getPracticeDate())
+                .practiceDate(practiceDate)
                 .durationMinutes(request.getDurationMinutes() != null ? request.getDurationMinutes() : 15)
                 .caregiverNotes(request.getCaregiverNotes())
                 .status("SUBMITTED")
@@ -180,6 +206,7 @@ public class CaregiverPracticeService {
 
         return CaregiverPracticeDtos.CaregiverPracticeSessionResponse.builder()
                 .id(s.getId())
+                .clientSessionId(s.getClientSessionId())
                 .homeProgramId(s.getHomeProgram().getId())
                 .homeProgramTitle(progTitle)
                 .childId(s.getChild().getId())

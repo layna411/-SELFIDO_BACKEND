@@ -40,6 +40,7 @@ public class CaregiverPracticeDtos {
     }
 
     public static class SubmitPracticeRequest {
+        private String clientSessionId;
         private Long homeProgramId;
         private Long childId;
         private Long activityId;
@@ -49,6 +50,9 @@ public class CaregiverPracticeDtos {
         private List<StepResultItemDto> stepResults;
 
         public SubmitPracticeRequest() {}
+
+        public String getClientSessionId() { return clientSessionId; }
+        public void setClientSessionId(String clientSessionId) { this.clientSessionId = clientSessionId; }
 
         public Long getHomeProgramId() { return homeProgramId; }
         public void setHomeProgramId(Long homeProgramId) { this.homeProgramId = homeProgramId; }
@@ -91,6 +95,7 @@ public class CaregiverPracticeDtos {
 
     public static class CaregiverPracticeSessionResponse {
         private Long id;
+        private String clientSessionId;
         private Long homeProgramId;
         private String homeProgramTitle;
         private Long childId;
@@ -116,6 +121,7 @@ public class CaregiverPracticeDtos {
 
         public static class Builder {
             private Long id;
+            private String clientSessionId;
             private Long homeProgramId;
             private String homeProgramTitle;
             private Long childId;
@@ -136,6 +142,7 @@ public class CaregiverPracticeDtos {
             private List<StepResultItemDto> stepResults;
 
             public Builder id(Long id) { this.id = id; return this; }
+            public Builder clientSessionId(String clientSessionId) { this.clientSessionId = clientSessionId; return this; }
             public Builder homeProgramId(Long homeProgramId) { this.homeProgramId = homeProgramId; return this; }
             public Builder homeProgramTitle(String homeProgramTitle) { this.homeProgramTitle = homeProgramTitle; return this; }
             public Builder childId(Long childId) { this.childId = childId; return this; }
@@ -158,6 +165,7 @@ public class CaregiverPracticeDtos {
             public CaregiverPracticeSessionResponse build() {
                 CaregiverPracticeSessionResponse res = new CaregiverPracticeSessionResponse();
                 res.id = id;
+                res.clientSessionId = clientSessionId;
                 res.homeProgramId = homeProgramId;
                 res.homeProgramTitle = homeProgramTitle;
                 res.childId = childId;
@@ -181,6 +189,7 @@ public class CaregiverPracticeDtos {
         }
 
         public Long getId() { return id; }
+        public String getClientSessionId() { return clientSessionId; }
         public Long getHomeProgramId() { return homeProgramId; }
         public String getHomeProgramTitle() { return homeProgramTitle; }
         public Long getChildId() { return childId; }

@@ -9,7 +9,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/home-practice")
+@RequestMapping({"/api/home-practice", "/api/caregiver-practice"})
 @CrossOrigin(origins = "*")
 public class CaregiverPracticeController {
 
@@ -37,7 +37,8 @@ public class CaregiverPracticeController {
         return ResponseEntity.ok(caregiverPracticeService.getPendingReviewsForTherapist());
     }
 
-    @GetMapping("/history/{childId}")
+    @GetMapping({"/history/{childId}", "/history/child/{childId}"})
+    @PreAuthorize("hasRole('CAREGIVER') or hasRole('THERAPIST') or hasRole('SUPER_ADMIN')")
     public ResponseEntity<List<CaregiverPracticeDtos.CaregiverPracticeSessionResponse>> getPracticeHistory(@PathVariable Long childId) {
         return ResponseEntity.ok(caregiverPracticeService.getPracticeHistoryForChild(childId));
     }

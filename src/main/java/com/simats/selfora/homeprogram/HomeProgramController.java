@@ -31,16 +31,19 @@ public class HomeProgramController {
     }
 
     @GetMapping("/child/{childId}")
+    @PreAuthorize("hasRole('CAREGIVER') or hasRole('THERAPIST') or hasRole('SUPER_ADMIN')")
     public ResponseEntity<HomeProgramDtos.HomeProgramResponse> getActiveHomeProgramForChild(@PathVariable Long childId) {
         return ResponseEntity.ok(homeProgramService.getActiveHomeProgramForChild(childId));
     }
 
     @GetMapping("/child/{childId}/all")
+    @PreAuthorize("hasRole('CAREGIVER') or hasRole('THERAPIST') or hasRole('SUPER_ADMIN')")
     public ResponseEntity<List<HomeProgramDtos.HomeProgramResponse>> getAllHomeProgramsForChild(@PathVariable Long childId) {
         return ResponseEntity.ok(homeProgramService.getAllHomeProgramsForChild(childId));
     }
 
     @GetMapping("/today")
+    @PreAuthorize("hasRole('CAREGIVER') or hasRole('THERAPIST') or hasRole('SUPER_ADMIN')")
     public ResponseEntity<List<HomeProgramDtos.HomeProgramResponse>> getTodayHomePrograms() {
         return ResponseEntity.ok(homeProgramService.getHomeProgramsForCaregiver());
     }
