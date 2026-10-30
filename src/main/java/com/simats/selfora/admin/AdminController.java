@@ -67,8 +67,13 @@ public class AdminController {
     }
 
     @PutMapping("/therapists/{id}/status")
-    public ResponseEntity<AdminDtos.TherapistProfile> updateTherapistStatus(@PathVariable Long id, @RequestParam boolean isActive) {
-        return ResponseEntity.ok(adminService.updateTherapistStatus(id, isActive, getCurrentUserId()));
+    public ResponseEntity<AdminDtos.TherapistProfile> updateTherapistStatus(
+            @PathVariable Long id,
+            @RequestParam(name = "active", required = false) Boolean active,
+            @RequestParam(name = "isActive", required = false) Boolean isActiveParam
+    ) {
+        boolean status = active != null ? active : (isActiveParam != null ? isActiveParam : true);
+        return ResponseEntity.ok(adminService.updateTherapistStatus(id, status, getCurrentUserId()));
     }
 
     @GetMapping("/caregivers")
