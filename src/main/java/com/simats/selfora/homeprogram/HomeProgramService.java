@@ -127,6 +127,13 @@ public class HomeProgramService {
         return mapToResponse(saved);
     }
 
+    public HomeProgramDtos.HomeProgramResponse getHomeProgramById(Long id) {
+        HomeProgram program = homeProgramRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Home program not found with ID: " + id));
+        childService.validateChildAccessForCurrentUser(program.getChild().getId());
+        return mapToResponse(program);
+    }
+
     public HomeProgramDtos.HomeProgramResponse getActiveHomeProgramForChild(Long childId) {
         childService.validateChildAccessForCurrentUser(childId);
 

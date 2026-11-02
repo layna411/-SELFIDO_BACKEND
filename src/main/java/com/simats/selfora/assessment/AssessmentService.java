@@ -88,7 +88,27 @@ public class AssessmentService {
     public AssessmentDtos.AssessmentResponse getAssessmentById(Long id) {
         Assessment assessment = assessmentRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Assessment not found with ID: " + id));
+        childService.validateChildAccessForCurrentUser(assessment.getChild().getId());
         List<AssessmentResult> results = assessmentResultRepository.findByAssessmentId(id);
+        return mapToResponse(assessment, results);
+    }
+
+    public List<AssessmentDtos.AssessmentResponse> getAssessmentsForChild(Long childId) {
+        childService.validateChildAccessForCurrentUser(childId);
+        List<Assessment> assessments = assessmentRepository.findByChildIdOrderByAssessmentDateDesc(childId);
+        return assessments.stream()
+                .map(a -> mapToResponse(a, assessmentResultRepository.findByAssessmentId(a.getId())))
+                .collect(Collectors.toList());
+    }
+
+    public AssessmentDtos.AssessmentResponse getLatestAssessmentForChild(Long childId, Long activityId) {
+        childService.validateChildAccessForCurrentUser(childId);
+        Assessment assessment = (activityId != null)
+                ? assessmentRepository.findTopByChildIdAndActivityIdOrderByAssessmentDateDesc(childId, activityId)
+                        .orElseThrow(() -> new ResourceNotFoundException("No assessment found for child ID " + childId + " and activity ID " + activityId))
+                : assessmentRepository.findByChildIdOrderByAssessmentDateDesc(childId).stream().findFirst()
+                        .orElseThrow(() -> new ResourceNotFoundException("No assessment found for child ID " + childId));
+        List<AssessmentResult> results = assessmentResultRepository.findByAssessmentId(assessment.getId());
         return mapToResponse(assessment, results);
     }
 

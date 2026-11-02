@@ -15,8 +15,10 @@ public class ChildModeDtos {
         private ChildActivitySummaryDto continueActivity;
         private List<ChildActivitySummaryDto> allActivities;
         private List<ChildRewardDto> earnedRewards;
+        private List<ChildRewardDto> allBadges;
         private int totalStars;
         private int completedCount;
+        private int currentStreak;
         private ChildModePreferenceDto preferences;
 
         public ChildDashboardResponse() {}
@@ -48,11 +50,17 @@ public class ChildModeDtos {
         public List<ChildRewardDto> getEarnedRewards() { return earnedRewards; }
         public void setEarnedRewards(List<ChildRewardDto> earnedRewards) { this.earnedRewards = earnedRewards; }
 
+        public List<ChildRewardDto> getAllBadges() { return allBadges; }
+        public void setAllBadges(List<ChildRewardDto> allBadges) { this.allBadges = allBadges; }
+
         public int getTotalStars() { return totalStars; }
         public void setTotalStars(int totalStars) { this.totalStars = totalStars; }
 
         public int getCompletedCount() { return completedCount; }
         public void setCompletedCount(int completedCount) { this.completedCount = completedCount; }
+
+        public int getCurrentStreak() { return currentStreak; }
+        public void setCurrentStreak(int currentStreak) { this.currentStreak = currentStreak; }
 
         public ChildModePreferenceDto getPreferences() { return preferences; }
         public void setPreferences(ChildModePreferenceDto preferences) { this.preferences = preferences; }
@@ -133,9 +141,21 @@ public class ChildModeDtos {
         private String badgeType;
         private String badgeTitle;
         private String badgeIcon;
+        private String description;
+        private boolean isUnlocked = true;
         private LocalDateTime earnedAt;
 
         public ChildRewardDto() {}
+
+        public ChildRewardDto(Long id, String badgeType, String badgeTitle, String badgeIcon, String description, boolean isUnlocked, LocalDateTime earnedAt) {
+            this.id = id;
+            this.badgeType = badgeType;
+            this.badgeTitle = badgeTitle;
+            this.badgeIcon = badgeIcon;
+            this.description = description;
+            this.isUnlocked = isUnlocked;
+            this.earnedAt = earnedAt;
+        }
 
         public Long getId() { return id; }
         public void setId(Long id) { this.id = id; }
@@ -149,8 +169,71 @@ public class ChildModeDtos {
         public String getBadgeIcon() { return badgeIcon; }
         public void setBadgeIcon(String badgeIcon) { this.badgeIcon = badgeIcon; }
 
+        public String getDescription() { return description; }
+        public void setDescription(String description) { this.description = description; }
+
+        public boolean isUnlocked() { return isUnlocked; }
+        public void setUnlocked(boolean unlocked) { isUnlocked = unlocked; }
+
         public LocalDateTime getEarnedAt() { return earnedAt; }
         public void setEarnedAt(LocalDateTime earnedAt) { this.earnedAt = earnedAt; }
+    }
+
+    public static class StepProgressResponse {
+        private Long id;
+        private Long childId;
+        private Long activityId;
+        private String activityTitle;
+        private Integer lastStepNumber;
+        private Integer totalStepsCompleted;
+        private Boolean isCompleted;
+        private Integer starsEarned;
+        private Integer starsAwarded;
+        private Integer totalStars;
+        private String newlyUnlockedBadge;
+        private String newlyUnlockedBadgeIcon;
+        private LocalDateTime lastPracticedAt;
+
+        public StepProgressResponse() {}
+
+        public Long getId() { return id; }
+        public void setId(Long id) { this.id = id; }
+
+        public Long getChildId() { return childId; }
+        public void setChildId(Long childId) { this.childId = childId; }
+
+        public Long getActivityId() { return activityId; }
+        public void setActivityId(Long activityId) { this.activityId = activityId; }
+
+        public String getActivityTitle() { return activityTitle; }
+        public void setActivityTitle(String activityTitle) { this.activityTitle = activityTitle; }
+
+        public Integer getLastStepNumber() { return lastStepNumber; }
+        public void setLastStepNumber(Integer lastStepNumber) { this.lastStepNumber = lastStepNumber; }
+
+        public Integer getTotalStepsCompleted() { return totalStepsCompleted; }
+        public void setTotalStepsCompleted(Integer totalStepsCompleted) { this.totalStepsCompleted = totalStepsCompleted; }
+
+        public Boolean getIsCompleted() { return isCompleted; }
+        public void setIsCompleted(Boolean isCompleted) { this.isCompleted = isCompleted; }
+
+        public Integer getStarsEarned() { return starsEarned; }
+        public void setStarsEarned(Integer starsEarned) { this.starsEarned = starsEarned; }
+
+        public Integer getStarsAwarded() { return starsAwarded; }
+        public void setStarsAwarded(Integer starsAwarded) { this.starsAwarded = starsAwarded; }
+
+        public Integer getTotalStars() { return totalStars; }
+        public void setTotalStars(Integer totalStars) { this.totalStars = totalStars; }
+
+        public String getNewlyUnlockedBadge() { return newlyUnlockedBadge; }
+        public void setNewlyUnlockedBadge(String newlyUnlockedBadge) { this.newlyUnlockedBadge = newlyUnlockedBadge; }
+
+        public String getNewlyUnlockedBadgeIcon() { return newlyUnlockedBadgeIcon; }
+        public void setNewlyUnlockedBadgeIcon(String newlyUnlockedBadgeIcon) { this.newlyUnlockedBadgeIcon = newlyUnlockedBadgeIcon; }
+
+        public LocalDateTime getLastPracticedAt() { return lastPracticedAt; }
+        public void setLastPracticedAt(LocalDateTime lastPracticedAt) { this.lastPracticedAt = lastPracticedAt; }
     }
 
     public static class ChildModePreferenceDto {

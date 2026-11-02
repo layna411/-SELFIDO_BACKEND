@@ -24,7 +24,7 @@ public class CaregiverPracticeController {
     }
 
     @PostMapping("/reviews/{sessionId}")
-    @PreAuthorize("hasRole('THERAPIST')")
+    @PreAuthorize("hasAnyRole('THERAPIST', 'SUPER_ADMIN', 'ADMIN') || hasAnyAuthority('ROLE_THERAPIST', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN')")
     public ResponseEntity<CaregiverPracticeDtos.CaregiverPracticeSessionResponse> reviewPracticeSession(
             @PathVariable Long sessionId,
             @RequestBody CaregiverPracticeDtos.TherapistReviewRequest request) {

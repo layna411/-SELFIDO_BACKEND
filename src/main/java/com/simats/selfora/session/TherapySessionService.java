@@ -180,8 +180,17 @@ public class TherapySessionService {
     public SessionDtos.SessionResponse getSessionById(Long id) {
         TherapySession session = sessionRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Session not found with ID: " + id));
+        childService.validateChildAccessForCurrentUser(session.getChild().getId());
         List<PerformanceRecord> records = performanceRecordRepository.findBySessionId(id);
         return mapToSessionResponse(session, records);
+    }
+
+    public List<SessionDtos.SessionResponse> getSessionsForChild(Long childId) {
+        childService.validateChildAccessForCurrentUser(childId);
+        List<TherapySession> sessions = sessionRepository.findByChildIdOrderByStartTimeDesc(childId);
+        return sessions.stream()
+                .map(s -> mapToSessionResponse(s, performanceRecordRepository.findBySessionId(s.getId())))
+                .collect(Collectors.toList());
     }
 
     private SessionDtos.SessionResponse mapToSessionResponse(TherapySession session, List<PerformanceRecord> records) {

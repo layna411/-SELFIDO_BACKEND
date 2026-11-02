@@ -32,7 +32,14 @@ public class TherapySessionController {
     }
 
     @GetMapping("/{id}")
+    @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('THERAPIST', 'ADMIN', 'SUPER_ADMIN', 'CAREGIVER')")
     public ResponseEntity<SessionDtos.SessionResponse> getSessionById(@PathVariable Long id) {
         return ResponseEntity.ok(sessionService.getSessionById(id));
+    }
+
+    @GetMapping("/child/{childId}")
+    @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('THERAPIST', 'ADMIN', 'SUPER_ADMIN', 'CAREGIVER')")
+    public ResponseEntity<java.util.List<SessionDtos.SessionResponse>> getSessionsForChild(@PathVariable Long childId) {
+        return ResponseEntity.ok(sessionService.getSessionsForChild(childId));
     }
 }

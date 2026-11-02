@@ -30,6 +30,12 @@ public class HomeProgramController {
         return ResponseEntity.ok(homeProgramService.updateProgramStatus(id, status));
     }
 
+    @GetMapping("/{id}")
+    @PreAuthorize("hasRole('CAREGIVER') or hasRole('THERAPIST') or hasRole('SUPER_ADMIN')")
+    public ResponseEntity<HomeProgramDtos.HomeProgramResponse> getHomeProgramById(@PathVariable Long id) {
+        return ResponseEntity.ok(homeProgramService.getHomeProgramById(id));
+    }
+
     @GetMapping("/child/{childId}")
     @PreAuthorize("hasRole('CAREGIVER') or hasRole('THERAPIST') or hasRole('SUPER_ADMIN')")
     public ResponseEntity<HomeProgramDtos.HomeProgramResponse> getActiveHomeProgramForChild(@PathVariable Long childId) {

@@ -24,7 +24,7 @@ public class ChildModeController {
     }
 
     @PostMapping("/progress")
-    public ResponseEntity<ChildActivityProgress> recordProgress(@RequestBody RecordStepProgressRequest request) {
+    public ResponseEntity<StepProgressResponse> recordProgress(@RequestBody RecordStepProgressRequest request) {
         return ResponseEntity.ok(childModeService.recordStepProgress(request));
     }
 

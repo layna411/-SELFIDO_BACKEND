@@ -21,7 +21,22 @@ public class AssessmentController {
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("hasRole('THERAPIST') or hasRole('SUPER_ADMIN') or hasRole('ADMIN')")
     public ResponseEntity<AssessmentDtos.AssessmentResponse> getAssessmentById(@PathVariable Long id) {
         return ResponseEntity.ok(assessmentService.getAssessmentById(id));
+    }
+
+    @GetMapping("/child/{childId}")
+    @PreAuthorize("hasRole('THERAPIST') or hasRole('SUPER_ADMIN') or hasRole('ADMIN')")
+    public ResponseEntity<java.util.List<AssessmentDtos.AssessmentResponse>> getAssessmentsForChild(@PathVariable Long childId) {
+        return ResponseEntity.ok(assessmentService.getAssessmentsForChild(childId));
+    }
+
+    @GetMapping("/child/{childId}/latest")
+    @PreAuthorize("hasRole('THERAPIST') or hasRole('SUPER_ADMIN') or hasRole('ADMIN')")
+    public ResponseEntity<AssessmentDtos.AssessmentResponse> getLatestAssessmentForChild(
+            @PathVariable Long childId,
+            @RequestParam(required = false) Long activityId) {
+        return ResponseEntity.ok(assessmentService.getLatestAssessmentForChild(childId, activityId));
     }
 }

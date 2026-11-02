@@ -142,7 +142,7 @@ public class Sprint2IntegrationTests {
     @DisplayName("Assigned therapist can download clinical PDF report")
     @WithMockUser(username = "therapist1", roles = {"THERAPIST"})
     void therapistCanDownloadPdfReport() throws Exception {
-        MvcResult result = mockMvc.perform(get("/api/reports/children/1/pdf?activityId=1"))
+        MvcResult result = mockMvc.perform(get("/api/reports/children/13/pdf?activityId=1"))
                 .andExpect(status().isOk())
                 .andExpect(header().string("Content-Type", "application/pdf"))
                 .andReturn();
