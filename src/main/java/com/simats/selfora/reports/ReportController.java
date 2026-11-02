@@ -16,15 +16,17 @@ public class ReportController {
     private PdfReportService pdfReportService;
 
     @GetMapping("/children/{childId}/pdf")
-    @PreAuthorize("hasRole('THERAPIST')")
+    @PreAuthorize("hasAnyRole('THERAPIST', 'SUPER_ADMIN', 'ADMIN') || hasAnyAuthority('ROLE_THERAPIST', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN')")
     public ResponseEntity<byte[]> downloadChildReport(
             @PathVariable Long childId,
             @RequestParam(defaultValue = "1") Long activityId) {
         byte[] pdfData = pdfReportService.generateChildReportPdf(childId, activityId);
 
         return ResponseEntity.ok()
-                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=Selfora_Clinical_Report_Child_" + childId + ".txt")
-                .contentType(MediaType.TEXT_PLAIN)
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=Selfora_Clinical_Report_Child_" + childId + ".pdf")
+                .header(HttpHeaders.ACCESS_CONTROL_EXPOSE_HEADERS, HttpHeaders.CONTENT_DISPOSITION)
+                .contentType(MediaType.APPLICATION_PDF)
+                .contentLength(pdfData.length)
                 .body(pdfData);
     }
 }

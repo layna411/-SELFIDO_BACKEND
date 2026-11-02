@@ -31,8 +31,8 @@ public class CaregiverPracticeController {
         return ResponseEntity.ok(caregiverPracticeService.reviewPracticeSession(sessionId, request));
     }
 
-    @GetMapping("/pending-reviews")
-    @PreAuthorize("hasRole('THERAPIST')")
+    @GetMapping({"/pending-reviews", "/reviews/pending"})
+    @PreAuthorize("hasAnyRole('THERAPIST', 'SUPER_ADMIN', 'ADMIN') || hasAnyAuthority('ROLE_THERAPIST', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN')")
     public ResponseEntity<List<CaregiverPracticeDtos.CaregiverPracticeSessionResponse>> getPendingReviews() {
         return ResponseEntity.ok(caregiverPracticeService.getPendingReviewsForTherapist());
     }

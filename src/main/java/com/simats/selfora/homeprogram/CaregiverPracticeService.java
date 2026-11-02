@@ -174,7 +174,26 @@ public class CaregiverPracticeService {
     }
 
     public List<CaregiverPracticeDtos.CaregiverPracticeSessionResponse> getPendingReviewsForTherapist() {
-        return practiceSessionRepository.findByStatusOrderBySubmittedAtDesc("SUBMITTED").stream()
+        String username = SecurityContextHolder.getContext().getAuthentication().getName();
+        User currentUser = userRepository.findByUsername(username)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found: " + username));
+
+        boolean isAdmin = currentUser.getRoles().stream()
+                .anyMatch(r -> r.getName().equals("ROLE_ADMIN") || r.getName().equals("ROLE_SUPER_ADMIN"));
+
+        List<CaregiverPracticeSession> allPending = practiceSessionRepository.findByStatusOrderBySubmittedAtDesc("SUBMITTED");
+
+        if (isAdmin) {
+            return allPending.stream().map(this::mapToResponse).collect(Collectors.toList());
+        }
+
+        // For therapists: only return pending reviews for children assigned to this therapist
+        List<Long> assignedChildIds = childRepository.findByTherapistId(currentUser.getId()).stream()
+                .map(Child::getId)
+                .collect(Collectors.toList());
+
+        return allPending.stream()
+                .filter(s -> s.getChild() != null && assignedChildIds.contains(s.getChild().getId()))
                 .map(this::mapToResponse)
                 .collect(Collectors.toList());
     }

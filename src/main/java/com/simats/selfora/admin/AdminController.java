@@ -113,8 +113,13 @@ public class AdminController {
     }
 
     @PostMapping("/therapists/{id}/reset-password")
-    public ResponseEntity<Void> resetTherapistPassword(@PathVariable Long id, @RequestParam(required = false) String newPassword) {
-        adminService.resetTherapistPassword(id, newPassword, getCurrentUserId());
+    public ResponseEntity<Void> resetTherapistPassword(
+            @PathVariable Long id,
+            @RequestBody(required = false) AdminDtos.ResetPasswordRequestBody request,
+            @RequestParam(required = false) String newPassword
+    ) {
+        String password = request != null && request.getNewPassword() != null ? request.getNewPassword() : newPassword;
+        adminService.resetTherapistPassword(id, password, getCurrentUserId());
         return ResponseEntity.ok().build();
     }
 
@@ -126,6 +131,14 @@ public class AdminController {
     @GetMapping("/children/{id}")
     public ResponseEntity<AdminDtos.AdminChildDetailProfile> getChildById(@PathVariable Long id) {
         return ResponseEntity.ok(adminService.getChildDetailProfileForAdmin(id));
+    }
+
+    @PutMapping("/children/{childId}/reassign-therapist")
+    public ResponseEntity<AdminDtos.AdminChildDetailProfile> reassignChildTherapist(
+            @PathVariable Long childId,
+            @RequestBody AdminDtos.ChildReassignRequest request
+    ) {
+        return ResponseEntity.ok(adminService.reassignChildTherapist(childId, request, getCurrentUserId()));
     }
 
     @GetMapping("/audit-logs")

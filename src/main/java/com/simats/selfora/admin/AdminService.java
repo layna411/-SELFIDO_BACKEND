@@ -469,6 +469,85 @@ public class AdminService {
     }
 
     @Transactional
+    public AdminDtos.AdminChildDetailProfile reassignChildTherapist(Long childId, AdminDtos.ChildReassignRequest request, Long actorId) {
+        if (childId == null) {
+            throw new IllegalArgumentException("Child ID must be provided");
+        }
+        if (request == null || request.getNewTherapistId() == null) {
+            throw new IllegalArgumentException("New Therapist ID must be provided in request body");
+        }
+        if (request.getReason() == null || request.getReason().trim().isEmpty()) {
+            throw new IllegalArgumentException("A valid reason for reassignment must be provided");
+        }
+
+        Child child = childRepository.findById(childId)
+                .orElseThrow(() -> new com.simats.selfora.exception.ResourceNotFoundException("Child not found with ID: " + childId));
+
+        User newTherapist = userRepository.findById(request.getNewTherapistId())
+                .orElseThrow(() -> new com.simats.selfora.exception.ResourceNotFoundException("Therapist not found with ID: " + request.getNewTherapistId()));
+
+        boolean isTherapist = newTherapist.getRoles().stream()
+                .anyMatch(r -> r.getName().equals("ROLE_THERAPIST"));
+        if (!isTherapist) {
+            throw new IllegalArgumentException("User ID " + request.getNewTherapistId() + " does not hold ROLE_THERAPIST");
+        }
+
+        if (newTherapist.getIsActive() != null && !newTherapist.getIsActive()) {
+            throw new IllegalArgumentException("Cannot reassign child to an inactive therapist (ID: " + request.getNewTherapistId() + ")");
+        }
+
+        // Query current assigned therapist
+        String previousTherapistName = "Unassigned";
+        Long previousTherapistId = null;
+        try {
+            List<Map<String, Object>> currentList = jdbcTemplate.queryForList(
+                    "SELECT u.id, u.full_name FROM users u JOIN therapist_children tc ON u.id = tc.therapist_id WHERE tc.child_id = ?",
+                    childId
+            );
+            if (!currentList.isEmpty()) {
+                previousTherapistId = ((Number) currentList.get(0).get("id")).longValue();
+                previousTherapistName = (String) currentList.get(0).get("full_name");
+            }
+        } catch (Exception ignored) {}
+
+        if (previousTherapistId != null && previousTherapistId.equals(newTherapist.getId())) {
+            throw new IllegalArgumentException("Child is already assigned to Therapist '" + newTherapist.getFullName() + "' (ID: " + newTherapist.getId() + ")");
+        }
+
+        // Update relationship in therapist_children table
+        Integer existingCount = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM therapist_children WHERE child_id = ?",
+                Integer.class,
+                childId
+        );
+
+        if (existingCount != null && existingCount > 0) {
+            jdbcTemplate.update(
+                    "UPDATE therapist_children SET therapist_id = ? WHERE child_id = ?",
+                    newTherapist.getId(), childId
+            );
+        } else {
+            jdbcTemplate.update(
+                    "INSERT INTO therapist_children (therapist_id, child_id) VALUES (?, ?)",
+                    newTherapist.getId(), childId
+            );
+        }
+
+        // Record Audit Log with complete details
+        String summary = String.format(
+                "Child '%s %s' (ID: %d) reassigned from %s (ID: %s) to '%s' (ID: %d). Reason: %s",
+                child.getFirstName(), child.getLastName(), childId,
+                previousTherapistName, previousTherapistId != null ? previousTherapistId : "None",
+                newTherapist.getFullName(), newTherapist.getId(),
+                request.getReason().trim()
+        );
+
+        logAudit(actorId, "ROLE_SUPER_ADMIN", "REASSIGN_THERAPIST", "CHILD:" + childId, summary);
+
+        return getChildDetailProfileForAdmin(childId);
+    }
+
+    @Transactional
     public void resetTherapistPassword(Long therapistId, String newPassword, Long actorId) {
         User user = userRepository.findById(therapistId)
                 .orElseThrow(() -> new RuntimeException("Therapist not found"));
