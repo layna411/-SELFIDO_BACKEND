@@ -31,11 +31,16 @@ public class ChildService {
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
         List<Child> children;
-        boolean isTherapist = user.getRoles().stream().anyMatch(r -> r.getName().equals("ROLE_THERAPIST"));
-        if (isTherapist) {
-            children = childRepository.findByTherapistId(user.getId());
+        boolean isAdmin = user.getRoles().stream().anyMatch(r -> r.getName().equals("ROLE_ADMIN") || r.getName().equals("ROLE_SUPER_ADMIN"));
+        if (isAdmin) {
+            children = childRepository.findAll();
         } else {
-            children = childRepository.findByCaregiverId(user.getId());
+            boolean isTherapist = user.getRoles().stream().anyMatch(r -> r.getName().equals("ROLE_THERAPIST"));
+            if (isTherapist) {
+                children = childRepository.findByTherapistId(user.getId());
+            } else {
+                children = childRepository.findByCaregiverId(user.getId());
+            }
         }
 
         return children.stream().map(this::mapToDto).collect(Collectors.toList());
@@ -100,18 +105,29 @@ public class ChildService {
 
     private ChildDto mapToDto(Child c) {
         String cgName = "Unassigned";
+        Long cgId = null;
+        String cgEmail = null;
+        String cgPhone = null;
+        Boolean cgActive = true;
         try {
-            List<String> cgNames = jdbcTemplate.queryForList(
-                    "SELECT u.full_name FROM users u JOIN caregiver_children cc ON u.id = cc.caregiver_id WHERE cc.child_id = ? LIMIT 1",
-                    String.class, c.getId()
+            List<java.util.Map<String, Object>> rows = jdbcTemplate.queryForList(
+                    "SELECT u.id, u.full_name, u.email, u.phone, u.is_active FROM users u JOIN caregiver_children cc ON u.id = cc.caregiver_id WHERE cc.child_id = ? LIMIT 1",
+                    c.getId()
             );
-            if (!cgNames.isEmpty() && cgNames.get(0) != null) cgName = cgNames.get(0);
+            if (!rows.isEmpty()) {
+                java.util.Map<String, Object> r = rows.get(0);
+                if (r.get("full_name") != null) cgName = (String) r.get("full_name");
+                if (r.get("id") != null) cgId = ((Number) r.get("id")).longValue();
+                if (r.get("email") != null) cgEmail = (String) r.get("email");
+                if (r.get("phone") != null) cgPhone = (String) r.get("phone");
+                if (r.get("is_active") != null) cgActive = (Boolean) r.get("is_active");
+            }
         } catch (Exception ignored) {}
 
         String thName = "Unassigned";
         try {
             List<String> thNames = jdbcTemplate.queryForList(
-                    "SELECT u.full_name FROM users u JOIN therapist_children tc ON u.id = tc.child_id WHERE tc.child_id = ? LIMIT 1",
+                    "SELECT u.full_name FROM users u JOIN therapist_children tc ON u.id = tc.therapist_id WHERE tc.child_id = ? LIMIT 1",
                     String.class, c.getId()
             );
             if (!thNames.isEmpty() && thNames.get(0) != null) thName = thNames.get(0);
@@ -128,6 +144,10 @@ public class ChildService {
                 .isActive(c.getIsActive())
                 .caregiverName(cgName)
                 .therapistName(thName)
+                .caregiverId(cgId)
+                .caregiverEmail(cgEmail)
+                .caregiverPhone(cgPhone)
+                .caregiverActive(cgActive)
                 .build();
     }
 }

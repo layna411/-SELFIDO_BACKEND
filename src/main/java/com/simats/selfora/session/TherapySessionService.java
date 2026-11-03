@@ -74,6 +74,13 @@ public class TherapySessionService {
 
     @Transactional
     public SessionDtos.PerformanceRecordResponse recordPerformance(Long sessionId, SessionDtos.RecordPerformanceRequest request) {
+        if (request == null) {
+            throw new IllegalArgumentException("RecordPerformanceRequest cannot be null");
+        }
+        if (request.getStepId() == null) {
+            throw new IllegalArgumentException("Step ID is required");
+        }
+
         TherapySession session = sessionRepository.findById(sessionId)
                 .orElseThrow(() -> new ResourceNotFoundException("Session not found with ID: " + sessionId));
 
@@ -82,30 +89,84 @@ public class TherapySessionService {
         TaskStep step = taskStepRepository.findById(request.getStepId())
                 .orElseThrow(() -> new ResourceNotFoundException("Step not found with ID: " + request.getStepId()));
 
-        Integer levelId = request.getPromptLevelId() != null ? request.getPromptLevelId() : 0;
-        PromptLevel promptLevel = promptLevelRepository.findById(levelId)
-                .orElseGet(() -> promptLevelRepository.findByLevelCode("INDEPENDENT")
-                .orElseGet(() -> promptLevelRepository.save(PromptLevel.builder().id(0).levelCode("INDEPENDENT").levelName("Independent").hierarchyOrder(0).build())));
+        String outcome = request.getOutcome();
+        Integer levelId = request.getPromptLevelId();
 
-        PerformanceRecord record = PerformanceRecord.builder()
-                .session(session)
-                .step(step)
-                .promptLevel(promptLevel)
-                .outcome(request.getOutcome() != null ? request.getOutcome() : "COMPLETED")
-                .attempts(request.getAttempts() != null ? request.getAttempts() : 1)
-                .durationSeconds(request.getDurationSeconds() != null ? request.getDurationSeconds() : 0)
-                .therapistNote(request.getTherapistNote())
-                .caregiverNote(request.getCaregiverNote())
-                .build();
+        if (levelId != null && (levelId < 0 || levelId > 8)) {
+            throw new IllegalArgumentException("Invalid prompt level ID: " + levelId + ". Supported prompt levels are 0 to 8.");
+        }
+
+        if ("UNABLE".equalsIgnoreCase(outcome)) {
+            if (levelId == null) levelId = 7;
+        } else if ("NOT_ASSESSED".equalsIgnoreCase(outcome)) {
+            if (levelId == null) levelId = 8;
+        } else if (levelId != null && levelId == 7) {
+            outcome = "UNABLE";
+        } else if (levelId != null && levelId == 8) {
+            outcome = "NOT_ASSESSED";
+        } else {
+            if (levelId == null) {
+                throw new IllegalArgumentException("Prompt level ID is required for assessed steps");
+            }
+            if (outcome == null || outcome.isBlank()) {
+                outcome = "COMPLETED";
+            }
+        }
+
+        final String finalOutcome = outcome;
+        final int targetLevelId = levelId;
+
+        PromptLevel promptLevel = promptLevelRepository.findById(targetLevelId)
+                .orElseGet(() -> {
+                    if (targetLevelId == 7) {
+                        return promptLevelRepository.save(PromptLevel.builder().id(7).levelCode("UNABLE").levelName("Unable").hierarchyOrder(7).build());
+                    } else if (targetLevelId == 8) {
+                        return promptLevelRepository.save(PromptLevel.builder().id(8).levelCode("NOT_ASSESSED").levelName("Not Assessed").hierarchyOrder(8).build());
+                    } else {
+                        return promptLevelRepository.findByLevelCode("INDEPENDENT")
+                                .orElseGet(() -> promptLevelRepository.save(PromptLevel.builder().id(0).levelCode("INDEPENDENT").levelName("Independent").hierarchyOrder(0).build()));
+                    }
+                });
+
+        // Find existing record for this session & step to update, or create a new one
+        PerformanceRecord record = performanceRecordRepository.findBySessionIdAndStepId(sessionId, step.getId())
+                .orElse(null);
+
+        if (record == null) {
+            record = PerformanceRecord.builder()
+                    .session(session)
+                    .step(step)
+                    .promptLevel(promptLevel)
+                    .outcome(finalOutcome)
+                    .attempts(request.getAttempts() != null ? request.getAttempts() : 1)
+                    .durationSeconds(request.getDurationSeconds() != null ? request.getDurationSeconds() : 0)
+                    .therapistNote(request.getTherapistNote())
+                    .caregiverNote(request.getCaregiverNote())
+                    .build();
+        } else {
+            record.setPromptLevel(promptLevel);
+            record.setOutcome(finalOutcome);
+            if (request.getAttempts() != null) record.setAttempts(request.getAttempts());
+            if (request.getDurationSeconds() != null) record.setDurationSeconds(request.getDurationSeconds());
+            if (request.getTherapistNote() != null) record.setTherapistNote(request.getTherapistNote());
+            if (request.getCaregiverNote() != null) record.setCaregiverNote(request.getCaregiverNote());
+        }
 
         PerformanceRecord savedRecord = performanceRecordRepository.save(record);
 
         // Record environment in GeneralizationRecord
         String env = request.getEnvironment() != null ? request.getEnvironment() : session.getEnvironment();
-        GeneralizationRecord genRecord = GeneralizationRecord.builder()
-                .performanceRecord(savedRecord)
-                .environment(env)
-                .build();
+        List<GeneralizationRecord> genRecords = generalizationRecordRepository.findByPerformanceRecordId(savedRecord.getId());
+        GeneralizationRecord genRecord;
+        if (!genRecords.isEmpty()) {
+            genRecord = genRecords.get(0);
+            genRecord.setEnvironment(env);
+        } else {
+            genRecord = GeneralizationRecord.builder()
+                    .performanceRecord(savedRecord)
+                    .environment(env)
+                    .build();
+        }
         generalizationRecordRepository.save(genRecord);
 
         return mapToPerformanceRecordResponse(savedRecord);
@@ -131,9 +192,9 @@ public class TherapySessionService {
         int totalSteps = allSteps.size();
         int completedSteps = (int) records.stream().filter(r -> "COMPLETED".equalsIgnoreCase(r.getOutcome())).count();
         int independentSteps = (int) records.stream().filter(r -> r.getPromptLevel().getId() == 0 && "COMPLETED".equalsIgnoreCase(r.getOutcome())).count();
-        int promptedSteps = (int) records.stream().filter(r -> r.getPromptLevel().getId() > 0 && "COMPLETED".equalsIgnoreCase(r.getOutcome())).count();
-        int unableSteps = (int) records.stream().filter(r -> "UNABLE".equalsIgnoreCase(r.getOutcome())).count();
-        int totalAssessedSteps = (int) records.stream().filter(r -> !"NOT_ASSESSED".equalsIgnoreCase(r.getOutcome())).count();
+        int promptedSteps = (int) records.stream().filter(r -> r.getPromptLevel().getId() > 0 && r.getPromptLevel().getId() <= 6 && "COMPLETED".equalsIgnoreCase(r.getOutcome())).count();
+        int unableSteps = (int) records.stream().filter(r -> "UNABLE".equalsIgnoreCase(r.getOutcome()) || r.getPromptLevel().getId() == 7).count();
+        int totalAssessedSteps = (int) records.stream().filter(r -> !"NOT_ASSESSED".equalsIgnoreCase(r.getOutcome()) && r.getPromptLevel().getId() != 8).count();
 
         double independencePct = totalAssessedSteps > 0 ? ((double) independentSteps / totalAssessedSteps) * 100.0 : 0.0;
 
@@ -148,7 +209,7 @@ public class TherapySessionService {
         List<Long> suggestedFocusSteps = new ArrayList<>();
 
         for (PerformanceRecord r : records) {
-            if ("UNABLE".equalsIgnoreCase(r.getOutcome()) || r.getPromptLevel().getId() >= 3) {
+            if ("UNABLE".equalsIgnoreCase(r.getOutcome()) || r.getPromptLevel().getId() == 7 || r.getPromptLevel().getId() >= 3) {
                 suggestedFocusSteps.add(r.getStep().getId());
             }
         }

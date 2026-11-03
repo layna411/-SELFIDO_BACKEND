@@ -94,7 +94,7 @@ public class ChildModeService {
             List<ChildActivityProgress> progress = childActivityProgressRepository.findByChildId(childId);
             for (ChildActivityProgress p : progress) {
                 if (p.getLastPracticedAt() != null) {
-                    dates.add(p.getLastPracticedAt().atZone(java.time.ZoneId.systemDefault()).withZoneSameInstant(CLINICAL_ZONE).toLocalDate());
+                    dates.add(p.getLastPracticedAt().toLocalDate());
                 }
             }
         } catch (Exception ignored) {}
@@ -103,7 +103,7 @@ public class ChildModeService {
             return 0;
         }
 
-        LocalDate today = LocalDate.now(CLINICAL_ZONE);
+        LocalDate today = LocalDate.now();
         LocalDate yesterday = today.minusDays(1);
 
         LocalDate current = null;
@@ -326,7 +326,7 @@ public class ChildModeService {
                 .orElseThrow(() -> new ResourceNotFoundException("Activity not found: " + request.getActivityId()));
 
         ChildActivityProgress progress = childActivityProgressRepository
-                .findByChildIdAndActivityIdForUpdate(request.getChildId(), request.getActivityId())
+                .findByChildIdAndActivityId(request.getChildId(), request.getActivityId())
                 .orElseThrow(() -> new ResourceNotFoundException("Progress record missing for child " + request.getChildId()));
 
         boolean alreadyCompleted = Boolean.TRUE.equals(progress.getIsCompleted());
@@ -344,6 +344,7 @@ public class ChildModeService {
                 progress.setTotalStepsCompleted(request.getStepNumber());
             }
         }
+        progress.setLastPracticedAt(LocalDateTime.now());
 
         // Check completion criteria
         boolean meetsCompletion = (request.getStepNumber() != null && request.getStepNumber() >= totalSteps)

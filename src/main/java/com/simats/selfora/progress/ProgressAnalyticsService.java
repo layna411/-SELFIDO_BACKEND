@@ -36,6 +36,9 @@ public class ProgressAnalyticsService {
     private AssessmentResultRepository assessmentResultRepository;
 
     @Autowired
+    private CaregiverPracticeSessionRepository caregiverPracticeSessionRepository;
+
+    @Autowired
     private ChildService childService;
 
     public ProgressDtos.ProgressSummaryResponse getProgressSummary(Long childId, Long activityId) {
@@ -190,9 +193,17 @@ public class ProgressAnalyticsService {
         List<ProgressDtos.RecommendationDto> recommendations = generateRuleBasedRecommendations(childId, activityId, sessions, difficultSteps, independentSteps);
 
         // Caregiver Home Practice Trend (Distinct from clinical score)
+        List<CaregiverPracticeSession> cgSessions = caregiverPracticeSessionRepository.findByChildIdOrderByPracticeDateDesc(childId);
+        int totalSubmissions = cgSessions.size();
+        long completedActivities = cgSessions.stream()
+                .filter(s -> "APPROVED".equalsIgnoreCase(s.getStatus()) || "COMPLETED".equalsIgnoreCase(s.getStatus()) || "SUBMITTED".equalsIgnoreCase(s.getStatus()))
+                .count();
+        String summary = totalSubmissions > 0
+                ? "Child completed " + totalSubmissions + " home practice sessions recorded by caregiver."
+                : "No home practice sessions recorded yet by caregiver.";
+        String freq = totalSubmissions > 0 ? totalSubmissions + " recorded submissions" : "None";
         ProgressDtos.CaregiverProgressSummaryDto caregiverSummary = new ProgressDtos.CaregiverProgressSummaryDto(
-                12, 4, "Child completed 12 home practice sessions with 85% compliance. Caregiver noted independence in step 7.",
-                "4 sessions/week", true
+                totalSubmissions, (int) completedActivities, summary, freq, true
         );
 
         return ProgressDtos.AnalyzeAndAdaptDashboardResponse.builder()
@@ -224,16 +235,15 @@ public class ProgressAnalyticsService {
 
         if (records.isEmpty()) return 0.0;
         long independentCount = records.stream()
-                .filter(r -> r.getPromptLevel().getId() == 0 && "COMPLETED".equalsIgnoreCase(r.getOutcome()))
+                .filter(r -> r.getPromptLevel() != null && r.getPromptLevel().getId() == 0 && "COMPLETED".equalsIgnoreCase(r.getOutcome()))
                 .count();
         return ((double) independentCount / records.size()) * 100.0;
     }
 
     private List<ProgressDtos.ActivityPerformanceCardDto> buildActivityPerformanceCards(Long childId) {
         List<ProgressDtos.ActivityPerformanceCardDto> cards = new ArrayList<>();
-        List<Activity> allActivities = activityRepository.findAll();
 
-        Map<String, String> categoryMap = new HashMap<>();
+        Map<String, String> categoryMap = new LinkedHashMap<>();
         categoryMap.put("Dressing", "Dressing");
         categoryMap.put("Eating", "Eating");
         categoryMap.put("Grooming", "Grooming");
@@ -245,12 +255,23 @@ public class ProgressAnalyticsService {
                     .filter(s -> s.getActivity() != null && s.getActivity().getTitle().toLowerCase().contains(cat.toLowerCase()))
                     .collect(Collectors.toList());
 
-            double curPct = sList.size() > 0 ? calculateSessionIndependence(sList.get(0)) : (cat.equalsIgnoreCase("Dressing") ? 72.0 : (cat.equalsIgnoreCase("Eating") ? 65.0 : (cat.equalsIgnoreCase("Shoes & Socks") ? 80.0 : 60.0)));
-            double prevPct = sList.size() > 1 ? calculateSessionIndependence(sList.get(1)) : curPct - 5.0;
-            String trendStr = curPct >= prevPct ? "IMPROVING" : "REGRESSING";
+            double curPct = 0.0;
+            double prevPct = 0.0;
+            String trendStr = "STABLE";
+
+            if (!sList.isEmpty()) {
+                curPct = calculateSessionIndependence(sList.get(0));
+                if (sList.size() > 1) {
+                    prevPct = calculateSessionIndependence(sList.get(1));
+                    trendStr = curPct > prevPct ? "IMPROVING" : (curPct < prevPct ? "REGRESSING" : "STABLE");
+                } else {
+                    prevPct = 0.0;
+                    trendStr = curPct > 0 ? "IMPROVING" : "STABLE";
+                }
+            }
 
             cards.add(new ProgressDtos.ActivityPerformanceCardDto(
-                    cat, Math.round(curPct * 10.0) / 10.0, Math.round(prevPct * 10.0) / 10.0, trendStr, Math.max(sList.size(), 3)
+                    cat, Math.round(curPct * 10.0) / 10.0, Math.round(prevPct * 10.0) / 10.0, trendStr, sList.size()
             ));
         }
 
@@ -266,8 +287,8 @@ public class ProgressAnalyticsService {
                     .filter(r -> r.getStep().getId().equals(step.getId()))
                     .collect(Collectors.toList());
 
-            int physicalCount = (int) records.stream().filter(r -> r.getPromptLevel().getId() >= 5).count();
-            int verbalCount = (int) records.stream().filter(r -> r.getPromptLevel().getId() == 3).count();
+            int physicalCount = (int) records.stream().filter(r -> r.getPromptLevel() != null && r.getPromptLevel().getId() >= 5).count();
+            int verbalCount = (int) records.stream().filter(r -> r.getPromptLevel() != null && r.getPromptLevel().getId() == 3).count();
             int unableCount = (int) records.stream().filter(r -> "UNABLE".equalsIgnoreCase(r.getOutcome())).count();
 
             if (physicalCount > 1 || unableCount > 0 || verbalCount >= 3) {
@@ -279,15 +300,6 @@ public class ProgressAnalyticsService {
                         mainAssistance, physicalCount, verbalCount, unableCount, desc
                 ));
             }
-        }
-
-        if (list.isEmpty() && !steps.isEmpty()) {
-            TaskStep step = steps.size() > 3 ? steps.get(3) : steps.get(0);
-            list.add(new ProgressDtos.DifficultStepDto(
-                    step.getId(), step.getStepNumber(), step.getTitle(), step.getActivity().getTitle(),
-                    "Verbal Prompt (L3)", 1, 4, 0,
-                    "Step " + step.getStepNumber() + " required Verbal Prompt in 4 of the last 5 assessed sessions."
-            ));
         }
 
         return list;
@@ -303,7 +315,7 @@ public class ProgressAnalyticsService {
                     .collect(Collectors.toList());
 
             long indepCount = records.stream()
-                    .filter(r -> r.getPromptLevel().getId() == 0 && "COMPLETED".equalsIgnoreCase(r.getOutcome()))
+                    .filter(r -> r.getPromptLevel() != null && r.getPromptLevel().getId() == 0 && "COMPLETED".equalsIgnoreCase(r.getOutcome()))
                     .count();
 
             if (indepCount >= 2) {
@@ -314,26 +326,46 @@ public class ProgressAnalyticsService {
             }
         }
 
-        if (list.isEmpty() && steps.size() >= 2) {
-            TaskStep step1 = steps.get(0);
-            TaskStep step2 = steps.get(1);
-            list.add(new ProgressDtos.IndependentStepDto(step1.getId(), step1.getStepNumber(), step1.getTitle(), step1.getActivity().getTitle(), 4, "Ready for Generalization"));
-            list.add(new ProgressDtos.IndependentStepDto(step2.getId(), step2.getStepNumber(), step2.getTitle(), step2.getActivity().getTitle(), 3, "Ready for Prompt Fading Review"));
-        }
-
         return list;
     }
 
     private ProgressDtos.SessionComparisonDto compareSessions(TherapySession current, TherapySession previous) {
-        String curDate = current != null ? current.getStartTime().toLocalDate().toString() : "Oct 02, 2026";
-        String prevDate = previous != null ? previous.getStartTime().toLocalDate().toString() : "Sep 28, 2026";
+        if (current == null && previous == null) {
+            return null;
+        }
+        String curDate = current != null && current.getStartTime() != null ? current.getStartTime().toLocalDate().toString() : "N/A";
+        String prevDate = previous != null && previous.getStartTime() != null ? previous.getStartTime().toLocalDate().toString() : "N/A";
 
         double curPct = calculateSessionIndependence(current);
         double prevPct = calculateSessionIndependence(previous);
 
-        List<String> improved = Arrays.asList("Step 1: Orient clothing front/back", "Step 7: Head insertion");
-        List<String> regressed = Arrays.asList();
-        List<String> unchanged = Arrays.asList("Step 4: Sleeve placement", "Step 10: Hem pull down");
+        List<String> improved = new ArrayList<>();
+        List<String> regressed = new ArrayList<>();
+        List<String> unchanged = new ArrayList<>();
+
+        if (current != null && previous != null) {
+            Map<Long, Integer> prevStepPrompts = performanceRecordRepository.findBySessionId(previous.getId()).stream()
+                    .filter(r -> r.getPromptLevel() != null)
+                    .collect(Collectors.toMap(r -> r.getStep().getId(), r -> r.getPromptLevel().getId(), (a, b) -> a));
+
+            List<PerformanceRecord> curRecords = performanceRecordRepository.findBySessionId(current.getId());
+            for (PerformanceRecord cr : curRecords) {
+                if (cr.getPromptLevel() == null) continue;
+                Long sId = cr.getStep().getId();
+                String stepLabel = "Step " + cr.getStep().getStepNumber() + ": " + cr.getStep().getTitle();
+                if (prevStepPrompts.containsKey(sId)) {
+                    int prevLvl = prevStepPrompts.get(sId);
+                    int curLvl = cr.getPromptLevel().getId();
+                    if (curLvl < prevLvl) {
+                        improved.add(stepLabel);
+                    } else if (curLvl > prevLvl) {
+                        regressed.add(stepLabel);
+                    } else {
+                        unchanged.add(stepLabel);
+                    }
+                }
+            }
+        }
 
         return new ProgressDtos.SessionComparisonDto(curDate, prevDate, Math.round(curPct * 10.0) / 10.0, Math.round(prevPct * 10.0) / 10.0, improved, regressed, unchanged);
     }
@@ -341,10 +373,27 @@ public class ProgressAnalyticsService {
     private List<String> generateFactualObservations(Long childId, Long activityId, List<TherapySession> sessions) {
         List<String> observations = new ArrayList<>();
         int sessionCount = sessions.size();
-        observations.add("Child completed " + Math.max(sessionCount, 5) + " therapy sessions for this ADL activity.");
-        observations.add("Step 4 required Verbal Prompt (L3) in 4 of the last 5 assessed clinical sessions.");
-        observations.add("Step 1 and Step 2 were completed independently (L0) across 3 consecutive sessions.");
-        observations.add("No 'Unable' outcomes recorded in the most recent clinical session.");
+        if (sessionCount == 0) {
+            observations.add("No clinical therapy sessions recorded yet for this activity.");
+            return observations;
+        }
+        observations.add("Child completed " + sessionCount + " clinical therapy session" + (sessionCount > 1 ? "s" : "") + " for this ADL activity.");
+
+        List<PerformanceRecord> records = performanceRecordRepository.findByChildId(childId).stream()
+                .filter(r -> r.getStep().getActivity().getId().equals(activityId))
+                .collect(Collectors.toList());
+
+        long unableCount = records.stream().filter(r -> "UNABLE".equalsIgnoreCase(r.getOutcome())).count();
+        if (unableCount == 0 && !records.isEmpty()) {
+            observations.add("No 'Unable' outcomes recorded across assessed sessions for this activity.");
+        } else if (unableCount > 0) {
+            observations.add(unableCount + " task step attempt(s) recorded as 'Unable' across sessions.");
+        }
+
+        long indepCount = records.stream().filter(r -> r.getPromptLevel() != null && r.getPromptLevel().getId() == 0 && "COMPLETED".equalsIgnoreCase(r.getOutcome())).count();
+        if (indepCount > 0) {
+            observations.add(indepCount + " step repetition(s) completed independently (Level 0) without assistance.");
+        }
         return observations;
     }
 
@@ -354,20 +403,34 @@ public class ProgressAnalyticsService {
     ) {
         List<ProgressDtos.RecommendationDto> recommendations = new ArrayList<>();
 
-        // Rule 1: Physical Assistance Rule
         for (ProgressDtos.DifficultStepDto d : difficultSteps) {
             if (d.getPhysicalAssistanceCount() > 0 || d.getMainAssistanceLevel().contains("Physical")) {
                 recommendations.add(new ProgressDtos.RecommendationDto(
                         "Repeated physical assistance (L5/L6) recorded on " + d.getStepTitle(),
-                        "Recent 3 sessions",
+                        "Recent assessed sessions",
                         d.getActivityTitle(),
                         d.getStepTitle(),
                         "Review task step breakdown and teaching approach with physical therapist."
                 ));
+            } else if (d.getUnableCount() > 0) {
+                recommendations.add(new ProgressDtos.RecommendationDto(
+                        "Repeated 'Unable' outcome recorded on " + d.getStepTitle(),
+                        "Recent assessed sessions",
+                        d.getActivityTitle(),
+                        d.getStepTitle(),
+                        "Review activity suitability, sensory barriers, and adaptation options with therapist."
+                ));
+            } else if (d.getVerbalPromptCount() >= 3) {
+                recommendations.add(new ProgressDtos.RecommendationDto(
+                        "Frequent verbal prompts required on " + d.getStepTitle(),
+                        "Recent assessed sessions",
+                        d.getActivityTitle(),
+                        d.getStepTitle(),
+                        "Consider introducing visual cues to transition from verbal to visual prompting."
+                ));
             }
         }
 
-        // Rule 2: Prompt Fading Readiness Rule
         for (ProgressDtos.IndependentStepDto ind : independentSteps) {
             if (ind.getConsecutiveIndependentSessions() >= 2) {
                 recommendations.add(new ProgressDtos.RecommendationDto(
@@ -375,37 +438,10 @@ public class ProgressAnalyticsService {
                         "Last " + ind.getConsecutiveIndependentSessions() + " sessions",
                         ind.getActivityTitle(),
                         ind.getStepTitle(),
-                        "Consider therapist review of readiness for prompt fading (Level 1 Visual -> Level 0 Independent)."
+                        "Consider therapist review of readiness for prompt fading."
                 ));
             }
         }
-
-        // Rule 3: Repeated Unable Rule
-        recommendations.add(new ProgressDtos.RecommendationDto(
-                "Repeated 'Unable' or refusal outcome on complex motor coordination steps",
-                "Sep 25 & Sep 28 sessions",
-                "Dressing",
-                "Step 10: Hem Pull Down",
-                "Review activity suitability, sensory barriers, and adaptation options with therapist."
-        ));
-
-        // Rule 4: Inconsistent Performance Rule
-        recommendations.add(new ProgressDtos.RecommendationDto(
-                "Inconsistent performance (fluctuating between Gesture and Verbal prompts)",
-                "Across 4 recorded sessions",
-                "Dressing",
-                "Step 4: Sleeve Placement",
-                "Consider additional observation across clinic sessions to stabilize performance."
-        ));
-
-        // Rule 5: Environmental Generalization Rule
-        recommendations.add(new ProgressDtos.RecommendationDto(
-                "Higher independence reported at Home than in Clinic session",
-                "Home log Oct 01 vs Clinic session Oct 02",
-                "Dressing",
-                "Overall Activity Sequence",
-                "Review environmental differences and test generalization across clinic settings."
-        ));
 
         return recommendations;
     }

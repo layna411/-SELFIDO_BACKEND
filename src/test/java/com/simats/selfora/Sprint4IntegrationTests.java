@@ -107,6 +107,9 @@ public class Sprint4IntegrationTests {
     @DisplayName("4. Successful step progression without activity completion")
     @WithMockUser(username = "caregiver1", roles = {"CAREGIVER"})
     void successfulStepProgression() throws Exception {
+        childActivityProgressRepository.findByChildIdAndActivityId(TEST_CHILD_ID, 1L)
+                .ifPresent(p -> childActivityProgressRepository.delete(p));
+
         RecordStepProgressRequest req = new RecordStepProgressRequest();
         req.setChildId(TEST_CHILD_ID);
         req.setActivityId(1L);
@@ -126,6 +129,9 @@ public class Sprint4IntegrationTests {
     @DisplayName("5. Incomplete activity handling does not award completion stars")
     @WithMockUser(username = "caregiver1", roles = {"CAREGIVER"})
     void incompleteActivityDoesNotAwardCompletionStars() throws Exception {
+        childActivityProgressRepository.findByChildIdAndActivityId(TEST_CHILD_ID, 1L)
+                .ifPresent(p -> childActivityProgressRepository.delete(p));
+
         // Step 2 out of 18 with isActivityCompleted = true (premature completion attempt)
         RecordStepProgressRequest req = new RecordStepProgressRequest();
         req.setChildId(TEST_CHILD_ID);

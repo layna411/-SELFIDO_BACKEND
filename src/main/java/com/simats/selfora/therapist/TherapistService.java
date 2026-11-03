@@ -59,43 +59,113 @@ public class TherapistService {
         User therapist = userRepository.findByUsername(username)
                 .orElseThrow(() -> new ResourceNotFoundException("Therapist not found"));
 
-        List<Child> children = childRepository.findByTherapistId(therapist.getId());
+        boolean isAdmin = therapist.getRoles().stream()
+                .anyMatch(r -> r.getName().equals("ROLE_ADMIN") || r.getName().equals("ROLE_SUPER_ADMIN"));
+
+        List<Child> children = isAdmin ? childRepository.findAll() : childRepository.findByTherapistId(therapist.getId());
         int activeChildrenCount = children.size();
 
-        Integer caregiverCount = jdbcTemplate.queryForObject(
-                "SELECT COUNT(DISTINCT caregiver_id) FROM caregiver_children cc JOIN children c ON cc.child_id = c.id JOIN therapist_children tc ON c.id = tc.child_id WHERE tc.therapist_id = ?",
-                Integer.class,
-                therapist.getId()
-        );
-        int linkedCaregiversCount = caregiverCount != null ? caregiverCount : 0;
+        int linkedCaregiversCount = 0;
+        int pendingAssessmentsCount = 0;
+        int activeHomeProgramsCount = 0;
+        int todaySessionsCount = 0;
+        int completedSessionsCount = 0;
+        int pendingReviewsCount = 0;
 
-        Integer pendingAss = jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM children c JOIN therapist_children tc ON c.id = tc.child_id LEFT JOIN assessments a ON c.id = a.child_id WHERE tc.therapist_id = ? AND a.id IS NULL",
-                Integer.class,
-                therapist.getId()
-        );
-        int pendingAssessmentsCount = pendingAss != null ? pendingAss : 0;
+        if (isAdmin) {
+            Integer cgCount = jdbcTemplate.queryForObject(
+                    "SELECT COUNT(DISTINCT caregiver_id) FROM caregiver_children",
+                    Integer.class
+            );
+            linkedCaregiversCount = cgCount != null ? cgCount : 0;
 
-        Integer activeHp = jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM home_programs hp WHERE hp.therapist_id = ? AND hp.is_active = true",
-                Integer.class,
-                therapist.getId()
-        );
-        int activeHomeProgramsCount = activeHp != null ? activeHp : 0;
+            Integer pendingAss = jdbcTemplate.queryForObject(
+                    "SELECT COUNT(*) FROM children c LEFT JOIN assessments a ON c.id = a.child_id WHERE a.id IS NULL AND (c.is_active = true OR c.is_active IS NULL)",
+                    Integer.class
+            );
+            pendingAssessmentsCount = pendingAss != null ? pendingAss : 0;
 
-        Integer todaySess = jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM therapy_sessions WHERE conducted_by_user_id = ? AND DATE(start_time) = CURRENT_DATE",
-                Integer.class,
-                therapist.getId()
-        );
-        int todaySessionsCount = todaySess != null ? todaySess : 0;
+            Integer activeHp = jdbcTemplate.queryForObject(
+                    "SELECT COUNT(*) FROM home_programs WHERE is_active = true",
+                    Integer.class
+            );
+            activeHomeProgramsCount = activeHp != null ? activeHp : 0;
 
-        Integer compSess = jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM therapy_sessions WHERE conducted_by_user_id = ? AND end_time IS NOT NULL",
-                Integer.class,
-                therapist.getId()
-        );
-        int completedSessionsCount = compSess != null ? compSess : 0;
+            Integer todaySess = jdbcTemplate.queryForObject(
+                    "SELECT COUNT(*) FROM therapy_sessions WHERE DATE(start_time) = CURRENT_DATE",
+                    Integer.class
+            );
+            todaySessionsCount = todaySess != null ? todaySess : 0;
+
+            Integer compSess = jdbcTemplate.queryForObject(
+                    "SELECT COUNT(*) FROM therapy_sessions WHERE end_time IS NOT NULL",
+                    Integer.class
+            );
+            completedSessionsCount = compSess != null ? compSess : 0;
+
+            Integer pRev = jdbcTemplate.queryForObject(
+                    "SELECT COUNT(*) FROM caregiver_practice_sessions WHERE status = 'SUBMITTED'",
+                    Integer.class
+            );
+            pendingReviewsCount = pRev != null ? pRev : 0;
+        } else {
+            Integer caregiverCount = jdbcTemplate.queryForObject(
+                    "SELECT COUNT(DISTINCT cc.caregiver_id) FROM caregiver_children cc " +
+                    "JOIN children c ON cc.child_id = c.id " +
+                    "JOIN therapist_children tc ON c.id = tc.child_id " +
+                    "WHERE tc.therapist_id = ? AND (c.is_active = true OR c.is_active IS NULL)",
+                    Integer.class,
+                    therapist.getId()
+            );
+            linkedCaregiversCount = caregiverCount != null ? caregiverCount : 0;
+
+            Integer pendingAss = jdbcTemplate.queryForObject(
+                    "SELECT COUNT(*) FROM children c " +
+                    "JOIN therapist_children tc ON c.id = tc.child_id " +
+                    "LEFT JOIN assessments a ON c.id = a.child_id " +
+                    "WHERE tc.therapist_id = ? AND a.id IS NULL AND (c.is_active = true OR c.is_active IS NULL)",
+                    Integer.class,
+                    therapist.getId()
+            );
+            pendingAssessmentsCount = pendingAss != null ? pendingAss : 0;
+
+            Integer activeHp = jdbcTemplate.queryForObject(
+                    "SELECT COUNT(*) FROM home_programs hp " +
+                    "JOIN therapist_children tc ON hp.child_id = tc.child_id " +
+                    "WHERE tc.therapist_id = ? AND hp.is_active = true",
+                    Integer.class,
+                    therapist.getId()
+            );
+            activeHomeProgramsCount = activeHp != null ? activeHp : 0;
+
+            Integer todaySess = jdbcTemplate.queryForObject(
+                    "SELECT COUNT(*) FROM therapy_sessions ts " +
+                    "JOIN therapist_children tc ON ts.child_id = tc.child_id " +
+                    "WHERE tc.therapist_id = ? AND DATE(ts.start_time) = CURRENT_DATE",
+                    Integer.class,
+                    therapist.getId()
+            );
+            todaySessionsCount = todaySess != null ? todaySess : 0;
+
+            Integer compSess = jdbcTemplate.queryForObject(
+                    "SELECT COUNT(*) FROM therapy_sessions ts " +
+                    "JOIN therapist_children tc ON ts.child_id = tc.child_id " +
+                    "WHERE tc.therapist_id = ? AND ts.end_time IS NOT NULL",
+                    Integer.class,
+                    therapist.getId()
+            );
+            completedSessionsCount = compSess != null ? compSess : 0;
+
+            Integer pRev = jdbcTemplate.queryForObject(
+                    "SELECT COUNT(*) FROM caregiver_practice_sessions cps " +
+                    "JOIN children c ON cps.child_id = c.id " +
+                    "JOIN therapist_children tc ON c.id = tc.child_id " +
+                    "WHERE tc.therapist_id = ? AND cps.status = 'SUBMITTED'",
+                    Integer.class,
+                    therapist.getId()
+            );
+            pendingReviewsCount = pRev != null ? pRev : 0;
+        }
 
         List<ScheduledSessionItem> todaySchedule = new ArrayList<>();
         try {
@@ -150,7 +220,6 @@ public class TherapistService {
             }
         } catch (Exception ignored) {}
 
-        int pendingReviewsCount = pendingReviews.size() > 0 ? pendingReviews.size() : activeHomeProgramsCount;
 
         return new TherapistDashboardSummaryResponse(
                 therapist.getFullName(),
@@ -253,7 +322,10 @@ public class TherapistService {
         User therapist = userRepository.findByUsername(username)
                 .orElseThrow(() -> new ResourceNotFoundException("Therapist not found"));
 
-        List<Child> children = childRepository.findByTherapistId(therapist.getId());
+        boolean isAdmin = therapist.getRoles().stream()
+                .anyMatch(r -> r.getName().equals("ROLE_ADMIN") || r.getName().equals("ROLE_SUPER_ADMIN"));
+
+        List<Child> children = isAdmin ? childRepository.findAll() : childRepository.findByTherapistId(therapist.getId());
 
         List<ChildSummaryItem> result = new ArrayList<>();
         for (Child c : children) {

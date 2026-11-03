@@ -66,16 +66,42 @@ public class AssessmentService {
             TaskStep step = taskStepRepository.findById(stepReq.getStepId())
                     .orElseThrow(() -> new ResourceNotFoundException("Task step not found: " + stepReq.getStepId()));
             
-            Integer levelId = stepReq.getPromptLevelId() != null ? stepReq.getPromptLevelId() : 0;
-            PromptLevel promptLevel = promptLevelRepository.findById(levelId)
-                    .orElseGet(() -> promptLevelRepository.findByLevelCode("INDEPENDENT")
-                    .orElseGet(() -> promptLevelRepository.save(PromptLevel.builder().id(0).levelCode("INDEPENDENT").levelName("Independent").hierarchyOrder(0).build())));
+            Integer levelId = stepReq.getPromptLevelId();
+            String outcome = stepReq.getOutcome();
+
+            if ("UNABLE".equalsIgnoreCase(outcome)) {
+                if (levelId == null) levelId = 7;
+            } else if ("NOT_ASSESSED".equalsIgnoreCase(outcome)) {
+                if (levelId == null) levelId = 8;
+            } else if (levelId != null && levelId == 7) {
+                outcome = "UNABLE";
+            } else if (levelId != null && levelId == 8) {
+                outcome = "NOT_ASSESSED";
+            } else {
+                if (levelId == null) levelId = 0;
+                if (outcome == null || outcome.isBlank()) outcome = "COMPLETED";
+            }
+
+            final int targetLevelId = levelId;
+            final String finalOutcome = outcome;
+
+            PromptLevel promptLevel = promptLevelRepository.findById(targetLevelId)
+                    .orElseGet(() -> {
+                        if (targetLevelId == 7) {
+                            return promptLevelRepository.save(PromptLevel.builder().id(7).levelCode("UNABLE").levelName("Unable").hierarchyOrder(7).build());
+                        } else if (targetLevelId == 8) {
+                            return promptLevelRepository.save(PromptLevel.builder().id(8).levelCode("NOT_ASSESSED").levelName("Not Assessed").hierarchyOrder(8).build());
+                        } else {
+                            return promptLevelRepository.findByLevelCode("INDEPENDENT")
+                                    .orElseGet(() -> promptLevelRepository.save(PromptLevel.builder().id(0).levelCode("INDEPENDENT").levelName("Independent").hierarchyOrder(0).build()));
+                        }
+                    });
 
             return AssessmentResult.builder()
                     .assessment(savedAssessment)
                     .step(step)
                     .baselinePromptLevel(promptLevel)
-                    .outcome(stepReq.getOutcome() != null ? stepReq.getOutcome() : "COMPLETED")
+                    .outcome(finalOutcome)
                     .notes(stepReq.getNotes())
                     .build();
         }).collect(Collectors.toList());

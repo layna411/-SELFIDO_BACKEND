@@ -27,7 +27,13 @@ public class MessagingService {
     @Autowired
     private ChildRepository childRepository;
 
+    @Autowired
+    private com.simats.selfora.child.ChildService childService;
+
     public MessageDtos.MessageResponse sendMessage(MessageDtos.SendMessageRequest request) {
+        if (request != null && request.getChildId() != null) {
+            childService.validateChildAccessForCurrentUser(request.getChildId());
+        }
         String username = SecurityContextHolder.getContext().getAuthentication().getName();
         User sender = userRepository.findByUsername(username)
                 .orElseThrow(() -> new ResourceNotFoundException("Sender user not found"));
@@ -51,6 +57,9 @@ public class MessagingService {
     }
 
     public List<MessageDtos.MessageResponse> getConversationForChild(Long childId) {
+        if (childId != null) {
+            childService.validateChildAccessForCurrentUser(childId);
+        }
         List<Message> messages = messageRepository.findConversationByChildId(childId);
         return messages.stream().map(this::mapToResponse).collect(Collectors.toList());
     }

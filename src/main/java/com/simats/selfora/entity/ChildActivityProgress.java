@@ -51,7 +51,9 @@ public class ChildActivityProgress {
     @PrePersist
     @PreUpdate
     protected void onSave() {
-        lastPracticedAt = LocalDateTime.now();
+        if (lastPracticedAt == null) {
+            lastPracticedAt = LocalDateTime.now();
+        }
     }
 
     public Long getId() { return id; }

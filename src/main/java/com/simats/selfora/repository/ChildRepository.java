@@ -9,10 +9,10 @@ import java.util.List;
 
 @Repository
 public interface ChildRepository extends JpaRepository<Child, Long> {
-    @Query(value = "SELECT c.* FROM children c JOIN therapist_children tc ON c.id = tc.child_id WHERE tc.therapist_id = :therapistId AND c.is_active = true", nativeQuery = true)
+    @Query(value = "SELECT c.* FROM children c JOIN therapist_children tc ON c.id = tc.child_id WHERE tc.therapist_id = :therapistId AND (c.is_active = true OR c.is_active IS NULL)", nativeQuery = true)
     List<Child> findByTherapistId(@Param("therapistId") Long therapistId);
 
-    @Query(value = "SELECT c.* FROM children c JOIN caregiver_children cc ON c.id = cc.child_id WHERE cc.caregiver_id = :caregiverId AND c.is_active = true", nativeQuery = true)
+    @Query(value = "SELECT c.* FROM children c JOIN caregiver_children cc ON c.id = cc.child_id WHERE cc.caregiver_id = :caregiverId AND (c.is_active = true OR c.is_active IS NULL)", nativeQuery = true)
     List<Child> findByCaregiverId(@Param("caregiverId") Long caregiverId);
 
     @Query(value = "SELECT COUNT(*) FROM therapist_children WHERE child_id = :childId AND therapist_id = :therapistId", nativeQuery = true)
