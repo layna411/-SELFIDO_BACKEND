@@ -109,6 +109,7 @@ public class AssessmentDtos {
             public AssessmentResponse build() { return new AssessmentResponse(assessmentId, childId, childName, therapistId, therapistName, activityId, activityTitle, assessmentDate, notes, stepResults); }
         }
 
+        public Long getId() { return assessmentId; }
         public Long getAssessmentId() { return assessmentId; }
         public void setAssessmentId(Long assessmentId) { this.assessmentId = assessmentId; }
         public Long getChildId() { return childId; }

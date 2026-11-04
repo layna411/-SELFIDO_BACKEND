@@ -82,20 +82,20 @@ public class Sprint4IntegrationTests {
     @DisplayName("3. Task-step retrieval across all ADL categories")
     @WithMockUser(username = "therapist1", roles = {"THERAPIST"})
     void taskStepRetrievalAcrossCategories() throws Exception {
-        // Dressing (Activity 1)
+        // Dressing (Activity 1 - 20 steps in SELFIDO task analysis)
         mockMvc.perform(get("/api/activities/1/steps"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(20));
+
+        // Shoes & Socks (Activity 9 - 18 steps in SELFIDO task analysis)
+        mockMvc.perform(get("/api/activities/9/steps"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(18));
 
-        // Shoes & Socks (Activity 9)
-        mockMvc.perform(get("/api/activities/9/steps"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(10));
-
-        // Eating (Activity 13)
+        // Eating (Activity 13 - 21 steps in SELFIDO task analysis)
         mockMvc.perform(get("/api/activities/13/steps"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(10));
+                .andExpect(jsonPath("$.length()").value(21));
 
         // Grooming (Activity 14)
         mockMvc.perform(get("/api/activities/14/steps"))
@@ -225,7 +225,7 @@ public class Sprint4IntegrationTests {
         RecordStepProgressRequest req = new RecordStepProgressRequest();
         req.setChildId(TEST_CHILD_ID);
         req.setActivityId(9L);
-        req.setStepNumber(10);
+        req.setStepNumber(18); // Activity 9 has 18 steps in SELFIDO task analysis
         req.setIsActivityCompleted(true);
 
         String json = objectMapper.writeValueAsString(req);

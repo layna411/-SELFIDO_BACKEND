@@ -46,6 +46,9 @@ public class ChildModeService {
     @Autowired
     private CaregiverPracticeSessionRepository caregiverPracticeSessionRepository;
 
+    @Autowired
+    private com.simats.selfora.activity.TaskEngineService taskEngineService;
+
     public static class BadgeDefinition {
         private final String type;
         private final String title;
@@ -168,8 +171,13 @@ public class ChildModeService {
                 .distinct()
                 .collect(Collectors.toList());
 
-        // All activities
-        List<Activity> allActivities = activityRepository.findAll();
+        // All active activities scoped to child's dressing gender pathway and common ADLs
+        String childGender = child.getGender();
+        String normalizedGender = com.simats.selfora.activity.TaskEngineService.normalizeGender(childGender);
+
+        List<Activity> allActivities = activityRepository.findByIsActiveTrue().stream()
+                .filter(act -> taskEngineService.isActivityMatchingGender(act, normalizedGender))
+                .collect(Collectors.toList());
         List<ChildActivityProgress> progressList = childActivityProgressRepository.findByChildId(childId);
 
         int totalStars = progressList.stream().mapToInt(p -> p.getStarsEarned() != null ? p.getStarsEarned() : 0).sum();
@@ -190,22 +198,36 @@ public class ChildModeService {
             ChildActivitySummaryDto sum = new ChildActivitySummaryDto();
             sum.setActivityId(act.getId());
             sum.setTitle(act.getTitle());
+            sum.setTitleTa(act.getTitleTa());
             sum.setDescription(act.getDescription());
+            sum.setDescriptionTa(act.getDescriptionTa());
+            sum.setStartingPosition(act.getStartingPosition());
+            sum.setStartingPositionTa(act.getStartingPositionTa());
+            sum.setTargetGender(act.getTargetGender());
             sum.setIconUrl(act.getIconUrl());
             
-            // Standardize category display for Child Mode (Dressing, Eating, Grooming, Shoes & Socks)
+            // Standardize category display for Child Mode (Upper Body Dressing, Lower Body Dressing, Shoes & Socks, Eating)
             String displayCategory = "General";
+            String subCategory = act.getCategory() != null ? act.getCategory().getSubCategory() : "";
+            sum.setSubCategory(subCategory);
+
             if (act.getCategory() != null) {
                 long catId = act.getCategory().getId() != null ? act.getCategory().getId() : 0L;
                 String actTitle = act.getTitle() != null ? act.getTitle().toLowerCase() : "";
                 if (catId == 5L || actTitle.contains("shoe") || actTitle.contains("sock")) {
                     displayCategory = "Shoes & Socks";
+                } else if (catId == 1L || (subCategory != null && subCategory.contains("UPPER"))) {
+                    displayCategory = "Upper Body Dressing";
+                } else if (catId == 2L || (subCategory != null && subCategory.contains("UPPER"))) {
+                    displayCategory = "Upper Body Dressing";
+                } else if (catId == 3L || (subCategory != null && subCategory.contains("LOWER"))) {
+                    displayCategory = "Lower Body Dressing";
+                } else if (catId == 4L || (subCategory != null && subCategory.contains("LOWER"))) {
+                    displayCategory = "Lower Body Dressing";
                 } else if (act.getCategory().getName().equalsIgnoreCase("DRESSING")) {
                     displayCategory = "Dressing";
                 } else if (act.getCategory().getName().equalsIgnoreCase("EATING")) {
                     displayCategory = "Eating";
-                } else if (act.getCategory().getName().equalsIgnoreCase("GROOMING")) {
-                    displayCategory = "Grooming";
                 } else {
                     displayCategory = act.getCategory().getName();
                 }
@@ -238,15 +260,22 @@ public class ChildModeService {
         response.setAllActivities(allSummaries);
 
         // Last unfinished activity for "Continue Learning"
-        Optional<ChildActivityProgress> lastUnfinished = childActivityProgressRepository
-                .findFirstByChildIdAndIsCompletedFalseOrderByLastPracticedAtDesc(childId);
+        Optional<ChildActivityProgress> lastUnfinished = progressList.stream()
+                .filter(p -> !Boolean.TRUE.equals(p.getIsCompleted()) && p.getLastPracticedAt() != null)
+                .sorted((a, b) -> b.getLastPracticedAt().compareTo(a.getLastPracticedAt()))
+                .filter(p -> p.getActivity() != null && Boolean.TRUE.equals(p.getActivity().getIsActive())
+                        && taskEngineService.isActivityMatchingGender(p.getActivity(), normalizedGender))
+                .findFirst();
+
         if (lastUnfinished.isPresent()) {
             Long actId = lastUnfinished.get().getActivity().getId();
             allSummaries.stream()
                     .filter(s -> s.getActivityId().equals(actId))
                     .findFirst()
                     .ifPresent(response::setContinueActivity);
-        } else if (!assignedSummaries.isEmpty()) {
+        }
+
+        if (response.getContinueActivity() == null && !assignedSummaries.isEmpty()) {
             response.setContinueActivity(assignedSummaries.get(0));
         }
 
@@ -346,14 +375,13 @@ public class ChildModeService {
         }
         progress.setLastPracticedAt(LocalDateTime.now());
 
-        // Check completion criteria
+        // Check completion criteria: child must reach the final step to complete
         boolean meetsCompletion = (request.getStepNumber() != null && request.getStepNumber() >= totalSteps)
                 || (progress.getTotalStepsCompleted() != null && progress.getTotalStepsCompleted() >= totalSteps);
 
-        if (Boolean.TRUE.equals(request.getIsActivityCompleted())) {
-            if (meetsCompletion) {
-                progress.setIsCompleted(true);
-                if (!alreadyCompleted) {
+        if (Boolean.TRUE.equals(request.getIsActivityCompleted()) && meetsCompletion) {
+            progress.setIsCompleted(true);
+            if (!alreadyCompleted) {
                     progress.setStarsEarned(5);
                     starsAwarded = 5;
 
@@ -422,7 +450,6 @@ public class ChildModeService {
                 progress.setIsCompleted(false);
                 starsAwarded = 0;
             }
-        }
 
         ChildActivityProgress saved = childActivityProgressRepository.saveAndFlush(progress);
 

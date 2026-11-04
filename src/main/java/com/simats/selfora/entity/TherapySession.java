@@ -26,12 +26,12 @@ public class TherapySession {
     private Activity activity;
 
     @Column(name = "session_type", nullable = false, length = 30)
-    private String sessionType;
+    private String sessionType = "CLINIC_THERAPY";
 
     @Column(length = 50)
     private String environment = "CLINIC";
 
-    @Column(name = "start_time", updatable = false)
+    @Column(name = "start_time")
     private LocalDateTime startTime;
 
     @Column(name = "end_time")
@@ -51,7 +51,7 @@ public class TherapySession {
         this.child = child;
         this.conductedByUser = conductedByUser;
         this.activity = activity;
-        this.sessionType = sessionType;
+        this.sessionType = sessionType != null ? sessionType : "CLINIC_THERAPY";
         this.environment = environment != null ? environment : "CLINIC";
         this.startTime = startTime;
         this.endTime = endTime;
@@ -67,7 +67,7 @@ public class TherapySession {
         private Child child;
         private User conductedByUser;
         private Activity activity;
-        private String sessionType;
+        private String sessionType = "CLINIC_THERAPY";
         private String environment = "CLINIC";
         private LocalDateTime startTime;
         private LocalDateTime endTime;
@@ -90,7 +90,9 @@ public class TherapySession {
 
     @PrePersist
     protected void onCreate() {
-        startTime = LocalDateTime.now();
+        if (startTime == null) {
+            startTime = LocalDateTime.now();
+        }
     }
 
     public Long getId() { return id; }

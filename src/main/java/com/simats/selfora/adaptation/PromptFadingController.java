@@ -37,12 +37,12 @@ public class PromptFadingController {
         return ResponseEntity.ok(promptFadingService.updatePlanStatus(planId, status));
     }
 
-    @GetMapping("/child/{childId}/plans")
+    @GetMapping({"/child/{childId}/plans", "/plans/child/{childId}"})
     public ResponseEntity<List<PromptFadingDtos.PromptFadingPlanResponse>> getFadingPlansForChild(@PathVariable Long childId) {
         return ResponseEntity.ok(promptFadingService.getFadingPlansForChild(childId));
     }
 
-    @GetMapping("/child/{childId}/history")
+    @GetMapping({"/child/{childId}/history", "/history/child/{childId}"})
     public ResponseEntity<List<PromptFadingDtos.PromptFadingHistoryItemResponse>> getFadingHistoryForChild(@PathVariable Long childId) {
         return ResponseEntity.ok(promptFadingService.getFadingHistoryForChild(childId));
     }

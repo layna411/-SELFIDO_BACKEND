@@ -9,21 +9,29 @@ public class ActivityDtos {
         private Long activityId;
         private Integer stepNumber;
         private String title;
+        private String titleTa;
         private String instructionText;
+        private String instructionTextTa;
         private String childInstruction;
+        private String childInstructionTa;
         private String audioPromptUrl;
+        private String audioPromptUrlTa;
         private List<MediaResponse> media;
 
         public TaskStepResponse() {}
 
-        public TaskStepResponse(Long id, Long activityId, Integer stepNumber, String title, String instructionText, String childInstruction, String audioPromptUrl, List<MediaResponse> media) {
+        public TaskStepResponse(Long id, Long activityId, Integer stepNumber, String title, String titleTa, String instructionText, String instructionTextTa, String childInstruction, String childInstructionTa, String audioPromptUrl, String audioPromptUrlTa, List<MediaResponse> media) {
             this.id = id;
             this.activityId = activityId;
             this.stepNumber = stepNumber;
             this.title = title;
+            this.titleTa = titleTa;
             this.instructionText = instructionText;
+            this.instructionTextTa = instructionTextTa;
             this.childInstruction = childInstruction;
+            this.childInstructionTa = childInstructionTa;
             this.audioPromptUrl = audioPromptUrl;
+            this.audioPromptUrlTa = audioPromptUrlTa;
             this.media = media;
         }
 
@@ -34,20 +42,28 @@ public class ActivityDtos {
             private Long activityId;
             private Integer stepNumber;
             private String title;
+            private String titleTa;
             private String instructionText;
+            private String instructionTextTa;
             private String childInstruction;
+            private String childInstructionTa;
             private String audioPromptUrl;
+            private String audioPromptUrlTa;
             private List<MediaResponse> media;
 
             public Builder id(Long id) { this.id = id; return this; }
             public Builder activityId(Long activityId) { this.activityId = activityId; return this; }
             public Builder stepNumber(Integer stepNumber) { this.stepNumber = stepNumber; return this; }
             public Builder title(String title) { this.title = title; return this; }
+            public Builder titleTa(String titleTa) { this.titleTa = titleTa; return this; }
             public Builder instructionText(String instructionText) { this.instructionText = instructionText; return this; }
+            public Builder instructionTextTa(String instructionTextTa) { this.instructionTextTa = instructionTextTa; return this; }
             public Builder childInstruction(String childInstruction) { this.childInstruction = childInstruction; return this; }
+            public Builder childInstructionTa(String childInstructionTa) { this.childInstructionTa = childInstructionTa; return this; }
             public Builder audioPromptUrl(String audioPromptUrl) { this.audioPromptUrl = audioPromptUrl; return this; }
+            public Builder audioPromptUrlTa(String audioPromptUrlTa) { this.audioPromptUrlTa = audioPromptUrlTa; return this; }
             public Builder media(List<MediaResponse> media) { this.media = media; return this; }
-            public TaskStepResponse build() { return new TaskStepResponse(id, activityId, stepNumber, title, instructionText, childInstruction, audioPromptUrl, media); }
+            public TaskStepResponse build() { return new TaskStepResponse(id, activityId, stepNumber, title, titleTa, instructionText, instructionTextTa, childInstruction, childInstructionTa, audioPromptUrl, audioPromptUrlTa, media); }
         }
 
         public Long getId() { return id; }
@@ -58,12 +74,20 @@ public class ActivityDtos {
         public void setStepNumber(Integer stepNumber) { this.stepNumber = stepNumber; }
         public String getTitle() { return title; }
         public void setTitle(String title) { this.title = title; }
+        public String getTitleTa() { return titleTa; }
+        public void setTitleTa(String titleTa) { this.titleTa = titleTa; }
         public String getInstructionText() { return instructionText; }
         public void setInstructionText(String instructionText) { this.instructionText = instructionText; }
+        public String getInstructionTextTa() { return instructionTextTa; }
+        public void setInstructionTextTa(String instructionTextTa) { this.instructionTextTa = instructionTextTa; }
         public String getChildInstruction() { return childInstruction; }
         public void setChildInstruction(String childInstruction) { this.childInstruction = childInstruction; }
+        public String getChildInstructionTa() { return childInstructionTa; }
+        public void setChildInstructionTa(String childInstructionTa) { this.childInstructionTa = childInstructionTa; }
         public String getAudioPromptUrl() { return audioPromptUrl; }
         public void setAudioPromptUrl(String audioPromptUrl) { this.audioPromptUrl = audioPromptUrl; }
+        public String getAudioPromptUrlTa() { return audioPromptUrlTa; }
+        public void setAudioPromptUrlTa(String audioPromptUrlTa) { this.audioPromptUrlTa = audioPromptUrlTa; }
         public List<MediaResponse> getMedia() { return media; }
         public void setMedia(List<MediaResponse> media) { this.media = media; }
     }
@@ -119,21 +143,29 @@ public class ActivityDtos {
         private Long categoryId;
         private String categoryName;
         private String title;
+        private String titleTa;
         private String targetGender;
+        private String startingPosition;
+        private String startingPositionTa;
         private String description;
+        private String descriptionTa;
         private String iconUrl;
         private Integer totalSteps;
         private List<TaskStepResponse> steps;
 
         public ActivityResponse() {}
 
-        public ActivityResponse(Long id, Long categoryId, String categoryName, String title, String targetGender, String description, String iconUrl, Integer totalSteps, List<TaskStepResponse> steps) {
+        public ActivityResponse(Long id, Long categoryId, String categoryName, String title, String titleTa, String targetGender, String startingPosition, String startingPositionTa, String description, String descriptionTa, String iconUrl, Integer totalSteps, List<TaskStepResponse> steps) {
             this.id = id;
             this.categoryId = categoryId;
             this.categoryName = categoryName;
             this.title = title;
+            this.titleTa = titleTa;
             this.targetGender = targetGender;
+            this.startingPosition = startingPosition;
+            this.startingPositionTa = startingPositionTa;
             this.description = description;
+            this.descriptionTa = descriptionTa;
             this.iconUrl = iconUrl;
             this.totalSteps = totalSteps;
             this.steps = steps;
@@ -146,8 +178,12 @@ public class ActivityDtos {
             private Long categoryId;
             private String categoryName;
             private String title;
+            private String titleTa;
             private String targetGender;
+            private String startingPosition;
+            private String startingPositionTa;
             private String description;
+            private String descriptionTa;
             private String iconUrl;
             private Integer totalSteps;
             private List<TaskStepResponse> steps;
@@ -156,12 +192,16 @@ public class ActivityDtos {
             public Builder categoryId(Long categoryId) { this.categoryId = categoryId; return this; }
             public Builder categoryName(String categoryName) { this.categoryName = categoryName; return this; }
             public Builder title(String title) { this.title = title; return this; }
+            public Builder titleTa(String titleTa) { this.titleTa = titleTa; return this; }
             public Builder targetGender(String targetGender) { this.targetGender = targetGender; return this; }
+            public Builder startingPosition(String startingPosition) { this.startingPosition = startingPosition; return this; }
+            public Builder startingPositionTa(String startingPositionTa) { this.startingPositionTa = startingPositionTa; return this; }
             public Builder description(String description) { this.description = description; return this; }
+            public Builder descriptionTa(String descriptionTa) { this.descriptionTa = descriptionTa; return this; }
             public Builder iconUrl(String iconUrl) { this.iconUrl = iconUrl; return this; }
             public Builder totalSteps(Integer totalSteps) { this.totalSteps = totalSteps; return this; }
             public Builder steps(List<TaskStepResponse> steps) { this.steps = steps; return this; }
-            public ActivityResponse build() { return new ActivityResponse(id, categoryId, categoryName, title, targetGender, description, iconUrl, totalSteps, steps); }
+            public ActivityResponse build() { return new ActivityResponse(id, categoryId, categoryName, title, titleTa, targetGender, startingPosition, startingPositionTa, description, descriptionTa, iconUrl, totalSteps, steps); }
         }
 
         public Long getId() { return id; }
@@ -172,10 +212,18 @@ public class ActivityDtos {
         public void setCategoryName(String categoryName) { this.categoryName = categoryName; }
         public String getTitle() { return title; }
         public void setTitle(String title) { this.title = title; }
+        public String getTitleTa() { return titleTa; }
+        public void setTitleTa(String titleTa) { this.titleTa = titleTa; }
         public String getTargetGender() { return targetGender; }
         public void setTargetGender(String targetGender) { this.targetGender = targetGender; }
+        public String getStartingPosition() { return startingPosition; }
+        public void setStartingPosition(String startingPosition) { this.startingPosition = startingPosition; }
+        public String getStartingPositionTa() { return startingPositionTa; }
+        public void setStartingPositionTa(String startingPositionTa) { this.startingPositionTa = startingPositionTa; }
         public String getDescription() { return description; }
         public void setDescription(String description) { this.description = description; }
+        public String getDescriptionTa() { return descriptionTa; }
+        public void setDescriptionTa(String descriptionTa) { this.descriptionTa = descriptionTa; }
         public String getIconUrl() { return iconUrl; }
         public void setIconUrl(String iconUrl) { this.iconUrl = iconUrl; }
         public Integer getTotalSteps() { return totalSteps; }

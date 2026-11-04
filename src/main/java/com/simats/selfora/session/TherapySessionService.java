@@ -43,13 +43,40 @@ public class TherapySessionService {
     @Autowired
     private com.simats.selfora.child.ChildService childService;
 
+    public void validateTherapistOrAdminAccess(Long childId) {
+        org.springframework.security.core.Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !auth.isAuthenticated()) {
+            throw new org.springframework.security.access.AccessDeniedException("User is not authenticated");
+        }
+        String username = auth.getName();
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found: " + username));
+
+        boolean isAdmin = user.getRoles().stream().anyMatch(r ->
+                "ROLE_ADMIN".equals(r.getName()) || "ROLE_SUPER_ADMIN".equals(r.getName()));
+        if (isAdmin) {
+            return;
+        }
+
+        boolean isTherapist = user.getRoles().stream().anyMatch(r -> "ROLE_THERAPIST".equals(r.getName()));
+        if (isTherapist) {
+            boolean hasAccess = childRepository.countByChildIdAndTherapistId(childId, user.getId()) > 0;
+            if (!hasAccess) {
+                throw new org.springframework.security.access.AccessDeniedException("Therapist " + username + " is not assigned to child ID: " + childId);
+            }
+            return;
+        }
+
+        throw new org.springframework.security.access.AccessDeniedException("Caregivers cannot access private clinical session summaries or therapist notes");
+    }
+
     @Transactional
     public SessionDtos.SessionResponse startSession(SessionDtos.StartSessionRequest request) {
         String username = SecurityContextHolder.getContext().getAuthentication().getName();
         User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
-        childService.validateChildAccessForCurrentUser(request.getChildId());
+        validateTherapistOrAdminAccess(request.getChildId());
 
         Child child = childRepository.findById(request.getChildId())
                 .orElseThrow(() -> new ResourceNotFoundException("Child not found"));
@@ -84,7 +111,7 @@ public class TherapySessionService {
         TherapySession session = sessionRepository.findById(sessionId)
                 .orElseThrow(() -> new ResourceNotFoundException("Session not found with ID: " + sessionId));
 
-        childService.validateChildAccessForCurrentUser(session.getChild().getId());
+        validateTherapistOrAdminAccess(session.getChild().getId());
 
         TaskStep step = taskStepRepository.findById(request.getStepId())
                 .orElseThrow(() -> new ResourceNotFoundException("Step not found with ID: " + request.getStepId()));
@@ -177,31 +204,36 @@ public class TherapySessionService {
         TherapySession session = sessionRepository.findById(sessionId)
                 .orElseThrow(() -> new ResourceNotFoundException("Session not found with ID: " + sessionId));
 
-        childService.validateChildAccessForCurrentUser(session.getChild().getId());
+        validateTherapistOrAdminAccess(session.getChild().getId());
 
-        session.setEndTime(LocalDateTime.now());
-        if (session.getStartTime() != null) {
-            long duration = java.time.Duration.between(session.getStartTime(), session.getEndTime()).getSeconds();
-            session.setTotalDurationSeconds((int) duration);
+        if (session.getEndTime() == null) {
+            session.setEndTime(LocalDateTime.now());
+            if (session.getStartTime() != null) {
+                long duration = java.time.Duration.between(session.getStartTime(), session.getEndTime()).getSeconds();
+                session.setTotalDurationSeconds((int) duration);
+            }
+            sessionRepository.save(session);
         }
-        sessionRepository.save(session);
 
         List<PerformanceRecord> records = performanceRecordRepository.findBySessionId(sessionId);
         List<TaskStep> allSteps = taskStepRepository.findByActivityIdOrderByStepNumberAsc(session.getActivity().getId());
 
         int totalSteps = allSteps.size();
         int completedSteps = (int) records.stream().filter(r -> "COMPLETED".equalsIgnoreCase(r.getOutcome())).count();
-        int independentSteps = (int) records.stream().filter(r -> r.getPromptLevel().getId() == 0 && "COMPLETED".equalsIgnoreCase(r.getOutcome())).count();
-        int promptedSteps = (int) records.stream().filter(r -> r.getPromptLevel().getId() > 0 && r.getPromptLevel().getId() <= 6 && "COMPLETED".equalsIgnoreCase(r.getOutcome())).count();
-        int unableSteps = (int) records.stream().filter(r -> "UNABLE".equalsIgnoreCase(r.getOutcome()) || r.getPromptLevel().getId() == 7).count();
-        int totalAssessedSteps = (int) records.stream().filter(r -> !"NOT_ASSESSED".equalsIgnoreCase(r.getOutcome()) && r.getPromptLevel().getId() != 8).count();
+        int independentSteps = (int) records.stream().filter(r -> r.getPromptLevel() != null && r.getPromptLevel().getId() == 0 && "COMPLETED".equalsIgnoreCase(r.getOutcome())).count();
+        int promptedSteps = (int) records.stream().filter(r -> r.getPromptLevel() != null && r.getPromptLevel().getId() > 0 && r.getPromptLevel().getId() <= 6 && "COMPLETED".equalsIgnoreCase(r.getOutcome())).count();
+        int unableSteps = (int) records.stream().filter(r -> "UNABLE".equalsIgnoreCase(r.getOutcome()) || (r.getPromptLevel() != null && r.getPromptLevel().getId() == 7)).count();
+        int notAssessedSteps = (int) records.stream().filter(r -> "NOT_ASSESSED".equalsIgnoreCase(r.getOutcome()) || (r.getPromptLevel() != null && r.getPromptLevel().getId() == 8)).count();
+        int totalAssessedSteps = (int) records.stream().filter(r -> !"NOT_ASSESSED".equalsIgnoreCase(r.getOutcome()) && (r.getPromptLevel() == null || r.getPromptLevel().getId() != 8)).count();
 
         double independencePct = totalAssessedSteps > 0 ? ((double) independentSteps / totalAssessedSteps) * 100.0 : 0.0;
 
-        Map<String, Integer> distribution = new HashMap<>();
+        Map<String, Integer> distribution = new LinkedHashMap<>();
         for (PerformanceRecord r : records) {
-            String code = r.getPromptLevel().getLevelCode();
-            distribution.put(code, distribution.getOrDefault(code, 0) + 1);
+            if (r.getPromptLevel() != null) {
+                String code = r.getPromptLevel().getLevelCode();
+                distribution.put(code, distribution.getOrDefault(code, 0) + 1);
+            }
         }
 
         // Fading Logic Recommendation
@@ -209,7 +241,7 @@ public class TherapySessionService {
         List<Long> suggestedFocusSteps = new ArrayList<>();
 
         for (PerformanceRecord r : records) {
-            if ("UNABLE".equalsIgnoreCase(r.getOutcome()) || r.getPromptLevel().getId() == 7 || r.getPromptLevel().getId() >= 3) {
+            if ("UNABLE".equalsIgnoreCase(r.getOutcome()) || (r.getPromptLevel() != null && (r.getPromptLevel().getId() == 7 || r.getPromptLevel().getId() >= 3))) {
                 suggestedFocusSteps.add(r.getStep().getId());
             }
         }
@@ -223,7 +255,9 @@ public class TherapySessionService {
         return SessionDtos.SessionSummaryResponse.builder()
                 .sessionId(session.getId())
                 .sessionCode(session.getSessionCode())
+                .childId(session.getChild().getId())
                 .childName(session.getChild().getFirstName() + " " + session.getChild().getLastName())
+                .activityId(session.getActivity().getId())
                 .activityTitle(session.getActivity().getTitle())
                 .totalSteps(totalSteps)
                 .completedSteps(completedSteps)
@@ -231,7 +265,7 @@ public class TherapySessionService {
                 .promptedSteps(promptedSteps)
                 .unableSteps(unableSteps)
                 .independencePercentage(Math.round(independencePct * 10.0) / 10.0)
-                .totalDurationSeconds(session.getTotalDurationSeconds())
+                .totalDurationSeconds(session.getTotalDurationSeconds() != null ? session.getTotalDurationSeconds() : 0)
                 .promptDistribution(distribution)
                 .suggestedNextPromptLevel(suggestedNextPrompt)
                 .suggestedFocusStepIds(suggestedFocusSteps)
@@ -241,13 +275,13 @@ public class TherapySessionService {
     public SessionDtos.SessionResponse getSessionById(Long id) {
         TherapySession session = sessionRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Session not found with ID: " + id));
-        childService.validateChildAccessForCurrentUser(session.getChild().getId());
+        validateTherapistOrAdminAccess(session.getChild().getId());
         List<PerformanceRecord> records = performanceRecordRepository.findBySessionId(id);
         return mapToSessionResponse(session, records);
     }
 
     public List<SessionDtos.SessionResponse> getSessionsForChild(Long childId) {
-        childService.validateChildAccessForCurrentUser(childId);
+        validateTherapistOrAdminAccess(childId);
         List<TherapySession> sessions = sessionRepository.findByChildIdOrderByStartTimeDesc(childId);
         return sessions.stream()
                 .map(s -> mapToSessionResponse(s, performanceRecordRepository.findBySessionId(s.getId())))
@@ -255,6 +289,57 @@ public class TherapySessionService {
     }
 
     private SessionDtos.SessionResponse mapToSessionResponse(TherapySession session, List<PerformanceRecord> records) {
+        List<TaskStep> allSteps = taskStepRepository.findByActivityIdOrderByStepNumberAsc(session.getActivity().getId());
+        int totalSteps = allSteps.size();
+
+        int completedSteps = (int) records.stream().filter(r -> "COMPLETED".equalsIgnoreCase(r.getOutcome())).count();
+        int independentSteps = (int) records.stream().filter(r -> r.getPromptLevel() != null && r.getPromptLevel().getId() == 0 && "COMPLETED".equalsIgnoreCase(r.getOutcome())).count();
+        int promptedSteps = (int) records.stream().filter(r -> r.getPromptLevel() != null && r.getPromptLevel().getId() > 0 && r.getPromptLevel().getId() <= 6 && "COMPLETED".equalsIgnoreCase(r.getOutcome())).count();
+        int unableSteps = (int) records.stream().filter(r -> "UNABLE".equalsIgnoreCase(r.getOutcome()) || (r.getPromptLevel() != null && r.getPromptLevel().getId() == 7)).count();
+        int notAssessedSteps = (int) records.stream().filter(r -> "NOT_ASSESSED".equalsIgnoreCase(r.getOutcome()) || (r.getPromptLevel() != null && r.getPromptLevel().getId() == 8)).count();
+
+        int totalAssessedSteps = (int) records.stream().filter(r -> !"NOT_ASSESSED".equalsIgnoreCase(r.getOutcome()) && (r.getPromptLevel() == null || r.getPromptLevel().getId() != 8)).count();
+
+        double independencePct = totalAssessedSteps > 0 ? ((double) independentSteps / totalAssessedSteps) * 100.0 : 0.0;
+        double roundedPct = Math.round(independencePct * 10.0) / 10.0;
+
+        Map<String, Integer> distribution = new LinkedHashMap<>();
+        for (PerformanceRecord r : records) {
+            if (r.getPromptLevel() != null) {
+                String code = r.getPromptLevel().getLevelCode();
+                distribution.put(code, distribution.getOrDefault(code, 0) + 1);
+            }
+        }
+
+        String mostFrequentPrompt = "None";
+        int maxCount = 0;
+        for (Map.Entry<String, Integer> entry : distribution.entrySet()) {
+            if (entry.getValue() > maxCount) {
+                maxCount = entry.getValue();
+                mostFrequentPrompt = entry.getKey();
+            }
+        }
+
+        String sessionOutcome;
+        if (session.getEndTime() != null) {
+            if (totalSteps > 0 && completedSteps >= totalSteps) {
+                sessionOutcome = "COMPLETED";
+            } else if (completedSteps > 0 || unableSteps > 0) {
+                sessionOutcome = "PARTIAL";
+            } else {
+                sessionOutcome = "COMPLETED";
+            }
+        } else {
+            sessionOutcome = "IN_PROGRESS";
+        }
+
+        int durationSeconds = 0;
+        if (session.getTotalDurationSeconds() != null && session.getTotalDurationSeconds() > 0) {
+            durationSeconds = session.getTotalDurationSeconds();
+        } else if (session.getStartTime() != null && session.getEndTime() != null) {
+            durationSeconds = (int) java.time.Duration.between(session.getStartTime(), session.getEndTime()).getSeconds();
+        }
+
         return SessionDtos.SessionResponse.builder()
                 .sessionId(session.getId())
                 .sessionCode(session.getSessionCode())
@@ -268,9 +353,19 @@ public class TherapySessionService {
                 .environment(session.getEnvironment())
                 .startTime(session.getStartTime())
                 .endTime(session.getEndTime())
-                .totalDurationSeconds(session.getTotalDurationSeconds())
+                .totalDurationSeconds(durationSeconds)
                 .summaryNotes(session.getSummaryNotes())
                 .performanceRecords(records.stream().map(this::mapToPerformanceRecordResponse).collect(Collectors.toList()))
+                .totalSteps(totalSteps)
+                .completedSteps(completedSteps)
+                .independentSteps(independentSteps)
+                .promptedSteps(promptedSteps)
+                .unableSteps(unableSteps)
+                .notAssessedSteps(notAssessedSteps)
+                .independencePercentage(roundedPct)
+                .sessionOutcome(sessionOutcome)
+                .promptDistribution(distribution)
+                .mostFrequentPromptLevel(mostFrequentPrompt)
                 .build();
     }
 

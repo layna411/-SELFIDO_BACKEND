@@ -16,7 +16,11 @@ public class ActivityController {
     private TaskEngineService taskEngineService;
 
     @GetMapping
-    public ResponseEntity<List<ActivityDtos.ActivityResponse>> getAllActivities() {
+    public ResponseEntity<List<ActivityDtos.ActivityResponse>> getAllActivities(
+            @RequestParam(required = false) String gender) {
+        if (gender != null && !gender.isBlank()) {
+            return ResponseEntity.ok(taskEngineService.getActivitiesForGender(gender));
+        }
         return ResponseEntity.ok(taskEngineService.getAllActiveActivities());
     }
 

@@ -78,13 +78,13 @@ public class Sprint4_1IntegrationTests {
         Activity shoes = activityRepository.findById(9L).orElse(null);
         assertNotNull(shoes, "Activity 9 (Velcro Shoes) must exist");
         List<TaskStep> shoesSteps = taskStepRepository.findByActivityIdOrderByStepNumberAsc(9L);
-        assertEquals(10, shoesSteps.size(), "Velcro Shoes must have exactly 10 seeded task steps");
+        assertEquals(18, shoesSteps.size(), "Velcro Shoes must have exactly 18 seeded task steps");
 
         // Eating with Spoon (Activity 13 - Eating)
         Activity spoon = activityRepository.findById(13L).orElse(null);
         assertNotNull(spoon, "Activity 13 (Eating with Spoon) must exist");
         List<TaskStep> spoonSteps = taskStepRepository.findByActivityIdOrderByStepNumberAsc(13L);
-        assertEquals(10, spoonSteps.size(), "Eating with Spoon must have exactly 10 seeded task steps");
+        assertEquals(21, spoonSteps.size(), "Eating with Spoon must have exactly 21 seeded task steps");
 
         // Toothbrushing (Activity 14 - Grooming)
         Activity tooth = activityRepository.findById(14L).orElse(null);
@@ -266,7 +266,7 @@ public class Sprint4_1IntegrationTests {
     @DisplayName("8. Concurrent completion requests safety: Exactly one thread awards 5 stars")
     @WithMockUser(username = "caregiver1", roles = {"CAREGIVER"})
     void concurrentCompletionRequestsSafety() throws Exception {
-        Long actId = 1L; // T-Shirt (18 steps)
+        Long actId = 1L; // T-Shirt (20 steps in SELFIDO task analysis)
 
         childActivityProgressRepository.findByChildIdAndActivityId(TEST_CHILD_ID, actId)
                 .ifPresent(p -> childActivityProgressRepository.delete(p));
@@ -279,7 +279,7 @@ public class Sprint4_1IntegrationTests {
         RecordStepProgressRequest req = new RecordStepProgressRequest();
         req.setChildId(TEST_CHILD_ID);
         req.setActivityId(actId);
-        req.setStepNumber(18);
+        req.setStepNumber(20);
         req.setIsActivityCompleted(true);
         String json = objectMapper.writeValueAsString(req);
         SecurityContext context = SecurityContextHolder.getContext();

@@ -13,6 +13,9 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
@@ -458,6 +461,11 @@ public class ChildProfileDynamicDataIntegrationTests {
     @Test
     @DisplayName("12. Prompt fading history returns auditable approved plan transitions")
     void test12_PromptFadingHistory_RetrievalScopedToChild() throws Exception {
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken(therapistA.getUsername(), null,
+                        Collections.singletonList(new SimpleGrantedAuthority("ROLE_THERAPIST")))
+        );
+
         PromptFadingDtos.CreatePromptFadingPlanRequest req = new PromptFadingDtos.CreatePromptFadingPlanRequest(
                 childA.getId(),
                 testActivity.getId(),

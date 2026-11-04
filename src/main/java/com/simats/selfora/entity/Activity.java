@@ -17,11 +17,23 @@ public class Activity {
     @Column(nullable = false, length = 150)
     private String title;
 
+    @Column(name = "title_ta", length = 150)
+    private String titleTa;
+
     @Column(name = "target_gender", length = 20)
     private String targetGender;
 
+    @Column(name = "starting_position", length = 500)
+    private String startingPosition;
+
+    @Column(name = "starting_position_ta", columnDefinition = "TEXT")
+    private String startingPositionTa;
+
     @Column(columnDefinition = "TEXT")
     private String description;
+
+    @Column(name = "description_ta", columnDefinition = "TEXT")
+    private String descriptionTa;
 
     @Column(name = "icon_url", length = 500)
     private String iconUrl;
@@ -34,12 +46,16 @@ public class Activity {
 
     public Activity() {}
 
-    public Activity(Long id, ActivityCategory category, String title, String targetGender, String description, String iconUrl, Boolean isActive, LocalDateTime createdAt) {
+    public Activity(Long id, ActivityCategory category, String title, String titleTa, String targetGender, String startingPosition, String startingPositionTa, String description, String descriptionTa, String iconUrl, Boolean isActive, LocalDateTime createdAt) {
         this.id = id;
         this.category = category;
         this.title = title;
+        this.titleTa = titleTa;
         this.targetGender = targetGender;
+        this.startingPosition = startingPosition;
+        this.startingPositionTa = startingPositionTa;
         this.description = description;
+        this.descriptionTa = descriptionTa;
         this.iconUrl = iconUrl;
         this.isActive = isActive != null ? isActive : true;
         this.createdAt = createdAt;
@@ -51,8 +67,12 @@ public class Activity {
         private Long id;
         private ActivityCategory category;
         private String title;
+        private String titleTa;
         private String targetGender;
+        private String startingPosition;
+        private String startingPositionTa;
         private String description;
+        private String descriptionTa;
         private String iconUrl;
         private Boolean isActive = true;
         private LocalDateTime createdAt;
@@ -60,12 +80,16 @@ public class Activity {
         public Builder id(Long id) { this.id = id; return this; }
         public Builder category(ActivityCategory category) { this.category = category; return this; }
         public Builder title(String title) { this.title = title; return this; }
+        public Builder titleTa(String titleTa) { this.titleTa = titleTa; return this; }
         public Builder targetGender(String targetGender) { this.targetGender = targetGender; return this; }
+        public Builder startingPosition(String startingPosition) { this.startingPosition = startingPosition; return this; }
+        public Builder startingPositionTa(String startingPositionTa) { this.startingPositionTa = startingPositionTa; return this; }
         public Builder description(String description) { this.description = description; return this; }
+        public Builder descriptionTa(String descriptionTa) { this.descriptionTa = descriptionTa; return this; }
         public Builder iconUrl(String iconUrl) { this.iconUrl = iconUrl; return this; }
         public Builder isActive(Boolean isActive) { this.isActive = isActive; return this; }
         public Builder createdAt(LocalDateTime createdAt) { this.createdAt = createdAt; return this; }
-        public Activity build() { return new Activity(id, category, title, targetGender, description, iconUrl, isActive, createdAt); }
+        public Activity build() { return new Activity(id, category, title, titleTa, targetGender, startingPosition, startingPositionTa, description, descriptionTa, iconUrl, isActive, createdAt); }
     }
 
     @PrePersist
@@ -82,11 +106,23 @@ public class Activity {
     public String getTitle() { return title; }
     public void setTitle(String title) { this.title = title; }
 
+    public String getTitleTa() { return titleTa; }
+    public void setTitleTa(String titleTa) { this.titleTa = titleTa; }
+
     public String getTargetGender() { return targetGender; }
     public void setTargetGender(String targetGender) { this.targetGender = targetGender; }
 
+    public String getStartingPosition() { return startingPosition; }
+    public void setStartingPosition(String startingPosition) { this.startingPosition = startingPosition; }
+
+    public String getStartingPositionTa() { return startingPositionTa; }
+    public void setStartingPositionTa(String startingPositionTa) { this.startingPositionTa = startingPositionTa; }
+
     public String getDescription() { return description; }
     public void setDescription(String description) { this.description = description; }
+
+    public String getDescriptionTa() { return descriptionTa; }
+    public void setDescriptionTa(String descriptionTa) { this.descriptionTa = descriptionTa; }
 
     public String getIconUrl() { return iconUrl; }
     public void setIconUrl(String iconUrl) { this.iconUrl = iconUrl; }

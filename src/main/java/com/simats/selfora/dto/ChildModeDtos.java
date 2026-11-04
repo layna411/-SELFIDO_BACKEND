@@ -69,9 +69,15 @@ public class ChildModeDtos {
     public static class ChildActivitySummaryDto {
         private Long activityId;
         private String title;
+        private String titleTa;
         private String description;
+        private String descriptionTa;
+        private String startingPosition;
+        private String startingPositionTa;
         private String iconUrl;
         private String categoryName;
+        private String subCategory;
+        private String targetGender;
         private int totalSteps;
         private int completedSteps;
         private boolean isAssigned;
@@ -86,8 +92,26 @@ public class ChildModeDtos {
         public String getTitle() { return title; }
         public void setTitle(String title) { this.title = title; }
 
+        public String getTitleTa() { return titleTa; }
+        public void setTitleTa(String titleTa) { this.titleTa = titleTa; }
+
         public String getDescription() { return description; }
         public void setDescription(String description) { this.description = description; }
+
+        public String getDescriptionTa() { return descriptionTa; }
+        public void setDescriptionTa(String descriptionTa) { this.descriptionTa = descriptionTa; }
+
+        public String getStartingPosition() { return startingPosition; }
+        public void setStartingPosition(String startingPosition) { this.startingPosition = startingPosition; }
+
+        public String getStartingPositionTa() { return startingPositionTa; }
+        public void setStartingPositionTa(String startingPositionTa) { this.startingPositionTa = startingPositionTa; }
+
+        public String getTargetGender() { return targetGender; }
+        public void setTargetGender(String targetGender) { this.targetGender = targetGender; }
+
+        public String getSubCategory() { return subCategory; }
+        public void setSubCategory(String subCategory) { this.subCategory = subCategory; }
 
         public String getIconUrl() { return iconUrl; }
         public void setIconUrl(String iconUrl) { this.iconUrl = iconUrl; }
