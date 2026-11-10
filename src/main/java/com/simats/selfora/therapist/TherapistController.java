@@ -1,6 +1,10 @@
 package com.simats.selfora.therapist;
 
+import com.simats.selfora.dto.HomeProgramDtos;
+import com.simats.selfora.dto.SessionDtos;
 import com.simats.selfora.dto.TherapistDtos.*;
+import com.simats.selfora.homeprogram.HomeProgramService;
+import com.simats.selfora.session.TherapySessionService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -17,9 +21,25 @@ public class TherapistController {
     @Autowired
     private TherapistService therapistService;
 
+    @Autowired
+    private TherapySessionService therapySessionService;
+
+    @Autowired
+    private HomeProgramService homeProgramService;
+
     @GetMapping("/dashboard-summary")
     public ResponseEntity<TherapistDashboardSummaryResponse> getDashboardSummary() {
         return ResponseEntity.ok(therapistService.getDashboardSummary());
+    }
+
+    @GetMapping("/sessions/today")
+    public ResponseEntity<List<SessionDtos.SessionResponse>> getTodaySessions() {
+        return ResponseEntity.ok(therapySessionService.getTodaySessionsForCurrentUser());
+    }
+
+    @GetMapping("/home-programs")
+    public ResponseEntity<List<HomeProgramDtos.HomeProgramResponse>> getAssignedHomePrograms() {
+        return ResponseEntity.ok(homeProgramService.getAssignedHomeProgramsForCurrentUser());
     }
 
     @PostMapping("/create-child-with-caregiver")

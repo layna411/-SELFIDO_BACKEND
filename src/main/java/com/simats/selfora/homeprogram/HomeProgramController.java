@@ -51,6 +51,6 @@ public class HomeProgramController {
     @GetMapping("/today")
     @PreAuthorize("hasRole('CAREGIVER') or hasRole('THERAPIST') or hasRole('SUPER_ADMIN')")
     public ResponseEntity<List<HomeProgramDtos.HomeProgramResponse>> getTodayHomePrograms() {
-        return ResponseEntity.ok(homeProgramService.getHomeProgramsForCaregiver());
+        return ResponseEntity.ok(homeProgramService.getAssignedHomeProgramsForCurrentUser());
     }
 }

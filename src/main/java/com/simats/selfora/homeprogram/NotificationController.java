@@ -25,4 +25,10 @@ public class NotificationController {
         notificationService.markAsRead(id);
         return ResponseEntity.ok().build();
     }
+
+    @PostMapping("/read-all")
+    public ResponseEntity<Void> markAllAsRead() {
+        notificationService.markAllAsReadForCurrentUser();
+        return ResponseEntity.ok().build();
+    }
 }

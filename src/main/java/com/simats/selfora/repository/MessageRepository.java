@@ -9,6 +9,6 @@ import java.util.List;
 
 @Repository
 public interface MessageRepository extends JpaRepository<Message, Long> {
-    @Query("SELECT m FROM Message m WHERE m.child.id = :childId ORDER BY m.sentAt ASC")
+    @Query("SELECT m FROM Message m WHERE m.child.id = :childId ORDER BY m.sentAt ASC, m.id ASC")
     List<Message> findConversationByChildId(@Param("childId") Long childId);
 }

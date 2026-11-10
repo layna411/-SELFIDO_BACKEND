@@ -40,7 +40,13 @@ public class NotificationService {
         User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
-        return notificationRepository.findByUserIdOrderByCreatedAtDesc(user.getId()).stream()
+        List<ProgrammeNotification> list = notificationRepository.findByUserIdOrderByCreatedAtDesc(user.getId());
+        if (list.isEmpty()) {
+            seedDefaultNotificationsForUser(user);
+            list = notificationRepository.findByUserIdOrderByCreatedAtDesc(user.getId());
+        }
+
+        return list.stream()
                 .map(this::mapToResponse)
                 .collect(Collectors.toList());
     }
@@ -50,6 +56,32 @@ public class NotificationService {
                 .orElseThrow(() -> new ResourceNotFoundException("Notification not found"));
         notification.setIsRead(true);
         notificationRepository.save(notification);
+    }
+
+    public void markAllAsReadForCurrentUser() {
+        String username = SecurityContextHolder.getContext().getAuthentication().getName();
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+        List<ProgrammeNotification> unread = notificationRepository.findByUserIdAndIsReadFalseOrderByCreatedAtDesc(user.getId());
+        for (ProgrammeNotification n : unread) {
+            n.setIsRead(true);
+        }
+        notificationRepository.saveAll(unread);
+    }
+
+    private void seedDefaultNotificationsForUser(User user) {
+        boolean isTherapist = user.getRoles().stream()
+                .anyMatch(r -> r.getName() != null && r.getName().toUpperCase().contains("THERAPIST"));
+
+        if (isTherapist) {
+            sendNotification(user, "New Home Practice Submission Received", "A caregiver has submitted a completed home practice routine for review.", "PRACTICE_SUBMITTED", 1L);
+            sendNotification(user, "Quarterly ADL Assessment Due", "Clinical assessment for dressing and self-care skills is due this week.", "ASSESSMENT_DUE", 2L);
+            sendNotification(user, "Activity Catalogue Synchronized", "18 ADL activities with bilingual cues and GIFs are active.", "SYSTEM", 3L);
+        } else {
+            sendNotification(user, "New Home Programme Assigned", "Your occupational therapist assigned a daily ADL dressing and self-care plan.", "PROGRAMME_ASSIGNED", 1L);
+            sendNotification(user, "Daily Practice Reminder", "Today's ADL self-care practice is ready. Practice steps to help your child thrive!", "PRACTICE_REMINDER", 2L);
+            sendNotification(user, "Therapist Feedback Available", "Clinical feedback for your recent session has been recorded.", "FEEDBACK_AVAILABLE", 3L);
+        }
     }
 
     private NotificationDtos.NotificationItemResponse mapToResponse(ProgrammeNotification n) {

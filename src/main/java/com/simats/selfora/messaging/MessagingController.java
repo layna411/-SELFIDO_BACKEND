@@ -24,4 +24,15 @@ public class MessagingController {
     public ResponseEntity<List<MessageDtos.MessageResponse>> getConversation(@PathVariable Long childId) {
         return ResponseEntity.ok(messagingService.getConversationForChild(childId));
     }
+
+    @PostMapping("/child/{childId}/read")
+    public ResponseEntity<Void> markConversationAsRead(@PathVariable Long childId) {
+        messagingService.markConversationAsRead(childId);
+        return ResponseEntity.ok().build();
+    }
+
+    @GetMapping("/partner/child/{childId}")
+    public ResponseEntity<MessageDtos.ChatPartnerResponse> getChatPartner(@PathVariable Long childId) {
+        return ResponseEntity.ok(messagingService.getChatPartnerForChild(childId));
+    }
 }

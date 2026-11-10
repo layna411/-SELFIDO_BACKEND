@@ -288,6 +288,38 @@ public class TherapySessionService {
                 .collect(Collectors.toList());
     }
 
+    @Transactional(readOnly = true)
+    public List<SessionDtos.SessionResponse> getTodaySessionsForCurrentUser() {
+        String username = SecurityContextHolder.getContext().getAuthentication().getName();
+        User currentUser = userRepository.findByUsername(username)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
+        boolean isAdmin = currentUser.getRoles().stream()
+                .anyMatch(r -> "ROLE_ADMIN".equalsIgnoreCase(r.getName()) || "ROLE_SUPER_ADMIN".equalsIgnoreCase(r.getName()));
+
+        java.time.LocalDate today = java.time.LocalDate.now();
+        LocalDateTime startOfDay = today.atStartOfDay();
+        LocalDateTime endOfDay = today.plusDays(1).atStartOfDay();
+
+        List<TherapySession> sessions;
+        if (isAdmin) {
+            sessions = sessionRepository.findByStartTimeGreaterThanEqualAndStartTimeLessThanOrderByStartTimeDesc(startOfDay, endOfDay);
+        } else {
+            List<Long> childIds = childRepository.findByTherapistId(currentUser.getId()).stream()
+                    .map(Child::getId)
+                    .collect(Collectors.toList());
+            if (childIds.isEmpty()) {
+                return Collections.emptyList();
+            }
+            sessions = sessionRepository.findByChildIdInAndStartTimeGreaterThanEqualAndStartTimeLessThanOrderByStartTimeDesc(childIds, startOfDay, endOfDay);
+        }
+
+        return sessions.stream()
+                .filter(s -> s.getChild() != null && (s.getChild().getIsActive() == null || Boolean.TRUE.equals(s.getChild().getIsActive())))
+                .map(s -> mapToSessionResponse(s, performanceRecordRepository.findBySessionId(s.getId())))
+                .collect(Collectors.toList());
+    }
+
     private SessionDtos.SessionResponse mapToSessionResponse(TherapySession session, List<PerformanceRecord> records) {
         List<TaskStep> allSteps = taskStepRepository.findByActivityIdOrderByStepNumberAsc(session.getActivity().getId());
         int totalSteps = allSteps.size();
@@ -340,11 +372,14 @@ public class TherapySessionService {
             durationSeconds = (int) java.time.Duration.between(session.getStartTime(), session.getEndTime()).getSeconds();
         }
 
+        String childLast = session.getChild().getLastName() != null && !session.getChild().getLastName().isBlank()
+                ? " " + session.getChild().getLastName() : "";
+
         return SessionDtos.SessionResponse.builder()
                 .sessionId(session.getId())
                 .sessionCode(session.getSessionCode())
                 .childId(session.getChild().getId())
-                .childName(session.getChild().getFirstName() + " " + session.getChild().getLastName())
+                .childName(session.getChild().getFirstName() + childLast)
                 .conductedByUserId(session.getConductedByUser().getId())
                 .conductedByUserName(session.getConductedByUser().getFullName())
                 .activityId(session.getActivity().getId())

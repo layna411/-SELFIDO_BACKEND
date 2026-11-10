@@ -10,6 +10,8 @@ import java.util.Optional;
 public interface HomeProgramRepository extends JpaRepository<HomeProgram, Long> {
     List<HomeProgram> findByChildId(Long childId);
     List<HomeProgram> findByChildIdAndIsActiveTrue(Long childId);
+    List<HomeProgram> findByChildIdInAndIsActiveTrueOrderByCreatedAtDesc(List<Long> childIds);
+    List<HomeProgram> findByIsActiveTrueOrderByCreatedAtDesc();
     List<HomeProgram> findByTherapistId(Long therapistId);
     Optional<HomeProgram> findTopByChildIdAndIsActiveTrueOrderByCreatedAtDesc(Long childId);
 }

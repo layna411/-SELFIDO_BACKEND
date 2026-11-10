@@ -94,4 +94,33 @@ public class MessageDtos {
         public LocalDateTime getSentAt() { return sentAt; }
         public void setSentAt(LocalDateTime sentAt) { this.sentAt = sentAt; }
     }
+
+    public static class ChatPartnerResponse {
+        private Long partnerId;
+        private String partnerName;
+        private String partnerRole;
+        private Long childId;
+        private String childName;
+
+        public ChatPartnerResponse() {}
+
+        public ChatPartnerResponse(Long partnerId, String partnerName, String partnerRole, Long childId, String childName) {
+            this.partnerId = partnerId;
+            this.partnerName = partnerName;
+            this.partnerRole = partnerRole;
+            this.childId = childId;
+            this.childName = childName;
+        }
+
+        public Long getPartnerId() { return partnerId; }
+        public void setPartnerId(Long partnerId) { this.partnerId = partnerId; }
+        public String getPartnerName() { return partnerName; }
+        public void setPartnerName(String partnerName) { this.partnerName = partnerName; }
+        public String getPartnerRole() { return partnerRole; }
+        public void setPartnerRole(String partnerRole) { this.partnerRole = partnerRole; }
+        public Long getChildId() { return childId; }
+        public void setChildId(Long childId) { this.childId = childId; }
+        public String getChildName() { return childName; }
+        public void setChildName(String childName) { this.childName = childName; }
+    }
 }

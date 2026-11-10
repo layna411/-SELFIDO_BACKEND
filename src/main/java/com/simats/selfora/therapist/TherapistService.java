@@ -16,13 +16,19 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.security.SecureRandom;
+import java.sql.Timestamp;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.Period;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
 public class TherapistService {
+
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(TherapistService.class);
+    private static final DateTimeFormatter TIME_FMT = DateTimeFormatter.ofPattern("hh:mm a");
 
     @Autowired
     private UserRepository userRepository;
@@ -72,39 +78,49 @@ public class TherapistService {
         int completedSessionsCount = 0;
         int pendingReviewsCount = 0;
 
+        LocalDate today = LocalDate.now();
+        Timestamp todayStart = Timestamp.valueOf(today.atStartOfDay());
+        Timestamp todayEnd = Timestamp.valueOf(today.plusDays(1).atStartOfDay());
+
         if (isAdmin) {
             Integer cgCount = jdbcTemplate.queryForObject(
-                    "SELECT COUNT(DISTINCT caregiver_id) FROM caregiver_children",
+                    "SELECT COUNT(DISTINCT cc.caregiver_id) FROM caregiver_children cc JOIN children c ON cc.child_id = c.id WHERE (c.is_active = true OR c.is_active IS NULL)",
                     Integer.class
             );
             linkedCaregiversCount = cgCount != null ? cgCount : 0;
 
             Integer pendingAss = jdbcTemplate.queryForObject(
-                    "SELECT COUNT(*) FROM children c LEFT JOIN assessments a ON c.id = a.child_id WHERE a.id IS NULL AND (c.is_active = true OR c.is_active IS NULL)",
+                    "SELECT COUNT(DISTINCT c.id) FROM children c LEFT JOIN assessments a ON c.id = a.child_id WHERE a.id IS NULL AND (c.is_active = true OR c.is_active IS NULL)",
                     Integer.class
             );
             pendingAssessmentsCount = pendingAss != null ? pendingAss : 0;
 
             Integer activeHp = jdbcTemplate.queryForObject(
-                    "SELECT COUNT(*) FROM home_programs WHERE is_active = true",
+                    "SELECT COUNT(DISTINCT hp.id) FROM home_programs hp JOIN children c ON hp.child_id = c.id " +
+                    "WHERE hp.is_active = true AND (hp.status IS NULL OR UPPER(hp.status) NOT IN ('COMPLETED', 'CANCELLED', 'PAUSED')) " +
+                    "AND (c.is_active = true OR c.is_active IS NULL)",
                     Integer.class
             );
             activeHomeProgramsCount = activeHp != null ? activeHp : 0;
 
             Integer todaySess = jdbcTemplate.queryForObject(
-                    "SELECT COUNT(*) FROM therapy_sessions WHERE DATE(start_time) = CURRENT_DATE",
-                    Integer.class
+                    "SELECT COUNT(DISTINCT ts.id) FROM therapy_sessions ts JOIN children c ON ts.child_id = c.id " +
+                    "WHERE (c.is_active = true OR c.is_active IS NULL) AND ts.start_time >= ? AND ts.start_time < ?",
+                    Integer.class,
+                    todayStart, todayEnd
             );
             todaySessionsCount = todaySess != null ? todaySess : 0;
 
             Integer compSess = jdbcTemplate.queryForObject(
-                    "SELECT COUNT(*) FROM therapy_sessions WHERE end_time IS NOT NULL",
+                    "SELECT COUNT(DISTINCT ts.id) FROM therapy_sessions ts JOIN children c ON ts.child_id = c.id " +
+                    "WHERE (c.is_active = true OR c.is_active IS NULL) AND ts.end_time IS NOT NULL",
                     Integer.class
             );
             completedSessionsCount = compSess != null ? compSess : 0;
 
             Integer pRev = jdbcTemplate.queryForObject(
-                    "SELECT COUNT(*) FROM caregiver_practice_sessions WHERE status = 'SUBMITTED'",
+                    "SELECT COUNT(DISTINCT cps.id) FROM caregiver_practice_sessions cps JOIN children c ON cps.child_id = c.id " +
+                    "WHERE cps.status = 'SUBMITTED' AND (c.is_active = true OR c.is_active IS NULL)",
                     Integer.class
             );
             pendingReviewsCount = pRev != null ? pRev : 0;
@@ -120,7 +136,7 @@ public class TherapistService {
             linkedCaregiversCount = caregiverCount != null ? caregiverCount : 0;
 
             Integer pendingAss = jdbcTemplate.queryForObject(
-                    "SELECT COUNT(*) FROM children c " +
+                    "SELECT COUNT(DISTINCT c.id) FROM children c " +
                     "JOIN therapist_children tc ON c.id = tc.child_id " +
                     "LEFT JOIN assessments a ON c.id = a.child_id " +
                     "WHERE tc.therapist_id = ? AND a.id IS NULL AND (c.is_active = true OR c.is_active IS NULL)",
@@ -130,37 +146,43 @@ public class TherapistService {
             pendingAssessmentsCount = pendingAss != null ? pendingAss : 0;
 
             Integer activeHp = jdbcTemplate.queryForObject(
-                    "SELECT COUNT(*) FROM home_programs hp " +
-                    "JOIN therapist_children tc ON hp.child_id = tc.child_id " +
-                    "WHERE tc.therapist_id = ? AND hp.is_active = true",
+                    "SELECT COUNT(DISTINCT hp.id) FROM home_programs hp " +
+                    "JOIN children c ON hp.child_id = c.id " +
+                    "JOIN therapist_children tc ON c.id = tc.child_id " +
+                    "WHERE tc.therapist_id = ? AND hp.is_active = true " +
+                    "AND (hp.status IS NULL OR UPPER(hp.status) NOT IN ('COMPLETED', 'CANCELLED', 'PAUSED')) " +
+                    "AND (c.is_active = true OR c.is_active IS NULL)",
                     Integer.class,
                     therapist.getId()
             );
             activeHomeProgramsCount = activeHp != null ? activeHp : 0;
 
             Integer todaySess = jdbcTemplate.queryForObject(
-                    "SELECT COUNT(*) FROM therapy_sessions ts " +
-                    "JOIN therapist_children tc ON ts.child_id = tc.child_id " +
-                    "WHERE tc.therapist_id = ? AND DATE(ts.start_time) = CURRENT_DATE",
+                    "SELECT COUNT(DISTINCT ts.id) FROM therapy_sessions ts " +
+                    "JOIN children c ON ts.child_id = c.id " +
+                    "JOIN therapist_children tc ON c.id = tc.child_id " +
+                    "WHERE tc.therapist_id = ? AND (c.is_active = true OR c.is_active IS NULL) " +
+                    "AND ts.start_time >= ? AND ts.start_time < ?",
                     Integer.class,
-                    therapist.getId()
+                    therapist.getId(), todayStart, todayEnd
             );
             todaySessionsCount = todaySess != null ? todaySess : 0;
 
             Integer compSess = jdbcTemplate.queryForObject(
-                    "SELECT COUNT(*) FROM therapy_sessions ts " +
-                    "JOIN therapist_children tc ON ts.child_id = tc.child_id " +
-                    "WHERE tc.therapist_id = ? AND ts.end_time IS NOT NULL",
+                    "SELECT COUNT(DISTINCT ts.id) FROM therapy_sessions ts " +
+                    "JOIN children c ON ts.child_id = c.id " +
+                    "JOIN therapist_children tc ON c.id = tc.child_id " +
+                    "WHERE tc.therapist_id = ? AND (c.is_active = true OR c.is_active IS NULL) AND ts.end_time IS NOT NULL",
                     Integer.class,
                     therapist.getId()
             );
             completedSessionsCount = compSess != null ? compSess : 0;
 
             Integer pRev = jdbcTemplate.queryForObject(
-                    "SELECT COUNT(*) FROM caregiver_practice_sessions cps " +
+                    "SELECT COUNT(DISTINCT cps.id) FROM caregiver_practice_sessions cps " +
                     "JOIN children c ON cps.child_id = c.id " +
                     "JOIN therapist_children tc ON c.id = tc.child_id " +
-                    "WHERE tc.therapist_id = ? AND cps.status = 'SUBMITTED'",
+                    "WHERE tc.therapist_id = ? AND cps.status = 'SUBMITTED' AND (c.is_active = true OR c.is_active IS NULL)",
                     Integer.class,
                     therapist.getId()
             );
@@ -169,44 +191,86 @@ public class TherapistService {
 
         List<ScheduledSessionItem> todaySchedule = new ArrayList<>();
         try {
-            List<Map<String, Object>> rows = jdbcTemplate.queryForList(
-                    "SELECT ts.id as session_id, ts.child_id, CONCAT(c.first_name, ' ', COALESCE(c.last_name, '')) as child_name, " +
-                    "DATE_FORMAT(ts.start_time, '%h:%i %p') as scheduled_time, COALESCE(a.name, 'ADL Session') as adl_activity, ts.status " +
-                    "FROM therapy_sessions ts " +
-                    "JOIN children c ON ts.child_id = c.id " +
-                    "JOIN therapist_children tc ON c.id = tc.child_id " +
-                    "LEFT JOIN activities a ON ts.activity_id = a.id " +
-                    "WHERE tc.therapist_id = ? " +
-                    "ORDER BY ts.start_time DESC LIMIT 5",
-                    therapist.getId()
-            );
+            List<Map<String, Object>> rows = isAdmin
+                    ? jdbcTemplate.queryForList(
+                            "SELECT DISTINCT ts.id as session_id, ts.child_id, " +
+                            "TRIM(CONCAT(c.first_name, ' ', COALESCE(c.last_name, ''))) as child_name, " +
+                            "ts.start_time, COALESCE(a.title, 'ADL Session') as adl_activity, " +
+                            "CASE WHEN ts.end_time IS NOT NULL THEN 'COMPLETED' ELSE 'IN_PROGRESS' END as status " +
+                            "FROM therapy_sessions ts " +
+                            "JOIN children c ON ts.child_id = c.id " +
+                            "LEFT JOIN activities a ON ts.activity_id = a.id " +
+                            "WHERE (c.is_active = true OR c.is_active IS NULL) " +
+                            "AND ts.start_time >= ? AND ts.start_time < ? " +
+                            "ORDER BY ts.start_time DESC",
+                            todayStart, todayEnd
+                    )
+                    : jdbcTemplate.queryForList(
+                            "SELECT DISTINCT ts.id as session_id, ts.child_id, " +
+                            "TRIM(CONCAT(c.first_name, ' ', COALESCE(c.last_name, ''))) as child_name, " +
+                            "ts.start_time, COALESCE(a.title, 'ADL Session') as adl_activity, " +
+                            "CASE WHEN ts.end_time IS NOT NULL THEN 'COMPLETED' ELSE 'IN_PROGRESS' END as status " +
+                            "FROM therapy_sessions ts " +
+                            "JOIN children c ON ts.child_id = c.id " +
+                            "JOIN therapist_children tc ON c.id = tc.child_id " +
+                            "LEFT JOIN activities a ON ts.activity_id = a.id " +
+                            "WHERE tc.therapist_id = ? AND (c.is_active = true OR c.is_active IS NULL) " +
+                            "AND ts.start_time >= ? AND ts.start_time < ? " +
+                            "ORDER BY ts.start_time DESC",
+                            therapist.getId(), todayStart, todayEnd
+                    );
             for (Map<String, Object> r : rows) {
+                String timeFormatted = formatTimeCell(r.get("start_time"));
                 todaySchedule.add(new ScheduledSessionItem(
                         ((Number) r.get("session_id")).longValue(),
                         ((Number) r.get("child_id")).longValue(),
                         (String) r.get("child_name"),
-                        r.get("scheduled_time") != null ? (String) r.get("scheduled_time") : "10:00 AM",
+                        timeFormatted,
                         (String) r.get("adl_activity"),
                         (String) r.get("status")
                 ));
             }
-        } catch (Exception ignored) {}
+        } catch (Exception ex) {
+            log.error("Failed to fetch todaySchedule for dashboard", ex);
+        }
 
         List<PendingReviewItem> pendingReviews = new ArrayList<>();
         try {
-            List<Map<String, Object>> rows = jdbcTemplate.queryForList(
-                    "SELECT cps.id as practice_id, cps.child_id, CONCAT(c.first_name, ' ', COALESCE(c.last_name, '')) as child_name, " +
-                    "COALESCE(u.full_name, 'Caregiver') as caregiver_name, COALESCE(hp.title, 'Home Program') as activity_name, " +
-                    "DATE_FORMAT(cps.created_at, '%Y-%m-%d') as submitted_date, COALESCE(cps.notes, 'Logged home practice') as notes " +
-                    "FROM caregiver_practice_sessions cps " +
-                    "JOIN children c ON cps.child_id = c.id " +
-                    "JOIN therapist_children tc ON c.id = tc.child_id " +
-                    "LEFT JOIN users u ON cps.caregiver_id = u.id " +
-                    "LEFT JOIN home_programs hp ON cps.home_program_id = hp.id " +
-                    "WHERE tc.therapist_id = ? AND cps.status = 'SUBMITTED' " +
-                    "ORDER BY cps.created_at DESC LIMIT 5",
-                    therapist.getId()
-            );
+            List<Map<String, Object>> rows = isAdmin
+                    ? jdbcTemplate.queryForList(
+                            "SELECT DISTINCT cps.id as practice_id, cps.child_id, " +
+                            "TRIM(CONCAT(c.first_name, ' ', COALESCE(c.last_name, ''))) as child_name, " +
+                            "COALESCE(u.full_name, 'Caregiver') as caregiver_name, " +
+                            "COALESCE(hp.title, a.title, 'Home Program') as activity_name, " +
+                            "DATE_FORMAT(COALESCE(cps.submitted_at, cps.created_at), '%Y-%m-%d') as submitted_date, " +
+                            "COALESCE(NULLIF(TRIM(cps.caregiver_notes), ''), 'Logged home practice') as notes, " +
+                            "COALESCE(cps.submitted_at, cps.created_at) as sort_ts " +
+                            "FROM caregiver_practice_sessions cps " +
+                            "JOIN children c ON cps.child_id = c.id " +
+                            "LEFT JOIN users u ON cps.caregiver_id = u.id " +
+                            "LEFT JOIN home_programs hp ON cps.home_program_id = hp.id " +
+                            "LEFT JOIN activities a ON cps.activity_id = a.id " +
+                            "WHERE cps.status = 'SUBMITTED' AND (c.is_active = true OR c.is_active IS NULL) " +
+                            "ORDER BY sort_ts DESC"
+                    )
+                    : jdbcTemplate.queryForList(
+                            "SELECT DISTINCT cps.id as practice_id, cps.child_id, " +
+                            "TRIM(CONCAT(c.first_name, ' ', COALESCE(c.last_name, ''))) as child_name, " +
+                            "COALESCE(u.full_name, 'Caregiver') as caregiver_name, " +
+                            "COALESCE(hp.title, a.title, 'Home Program') as activity_name, " +
+                            "DATE_FORMAT(COALESCE(cps.submitted_at, cps.created_at), '%Y-%m-%d') as submitted_date, " +
+                            "COALESCE(NULLIF(TRIM(cps.caregiver_notes), ''), 'Logged home practice') as notes, " +
+                            "COALESCE(cps.submitted_at, cps.created_at) as sort_ts " +
+                            "FROM caregiver_practice_sessions cps " +
+                            "JOIN children c ON cps.child_id = c.id " +
+                            "JOIN therapist_children tc ON c.id = tc.child_id " +
+                            "LEFT JOIN users u ON cps.caregiver_id = u.id " +
+                            "LEFT JOIN home_programs hp ON cps.home_program_id = hp.id " +
+                            "LEFT JOIN activities a ON cps.activity_id = a.id " +
+                            "WHERE tc.therapist_id = ? AND cps.status = 'SUBMITTED' AND (c.is_active = true OR c.is_active IS NULL) " +
+                            "ORDER BY sort_ts DESC",
+                            therapist.getId()
+                    );
             for (Map<String, Object> r : rows) {
                 pendingReviews.add(new PendingReviewItem(
                         ((Number) r.get("practice_id")).longValue(),
@@ -218,7 +282,9 @@ public class TherapistService {
                         (String) r.get("notes")
                 ));
             }
-        } catch (Exception ignored) {}
+        } catch (Exception ex) {
+            log.error("Failed to fetch pendingReviews for dashboard", ex);
+        }
 
 
         return new TherapistDashboardSummaryResponse(
@@ -235,6 +301,15 @@ public class TherapistService {
                 todaySchedule,
                 pendingReviews
         );
+    }
+
+    private String formatTimeCell(Object tsObj) {
+        if (tsObj instanceof Timestamp ts) {
+            return ts.toLocalDateTime().format(TIME_FMT);
+        } else if (tsObj instanceof LocalDateTime ldt) {
+            return ldt.format(TIME_FMT);
+        }
+        return "Today";
     }
 
     @Transactional
@@ -460,6 +535,38 @@ public class TherapistService {
                     "SELECT COUNT(*) FROM caregiver_practice_sessions WHERE caregiver_id = ? AND child_id = ? AND status = 'SUBMITTED'",
                     Integer.class, caregiverId, childId
             );
+            Integer unreadMessages = 0;
+            try {
+                unreadMessages = jdbcTemplate.queryForObject(
+                        "SELECT COUNT(*) FROM messages WHERE child_id = ? AND receiver_id = ? AND is_read = false",
+                        Integer.class, childId, therapist.getId()
+                );
+            } catch (Exception ignored) {}
+
+            String lastMsg = null;
+            String lastMsgAtIso = null;
+            Long lastSenderId = null;
+            try {
+                List<Map<String, Object>> lastMsgs = jdbcTemplate.queryForList(
+                        "SELECT message_text, sent_at, sender_id FROM messages WHERE child_id = ? ORDER BY sent_at DESC, id DESC LIMIT 1",
+                        childId
+                );
+                if (!lastMsgs.isEmpty()) {
+                    Map<String, Object> lm = lastMsgs.get(0);
+                    lastMsg = (String) lm.get("message_text");
+                    Object sentObj = lm.get("sent_at");
+                    if (sentObj instanceof java.sql.Timestamp) {
+                        lastMsgAtIso = ((java.sql.Timestamp) sentObj).toLocalDateTime().toString();
+                    } else if (sentObj instanceof java.time.LocalDateTime) {
+                        lastMsgAtIso = ((java.time.LocalDateTime) sentObj).toString();
+                    } else if (sentObj != null) {
+                        lastMsgAtIso = sentObj.toString();
+                    }
+                    if (lm.get("sender_id") instanceof Number) {
+                        lastSenderId = ((Number) lm.get("sender_id")).longValue();
+                    }
+                }
+            } catch (Exception ignored) {}
 
             Boolean isActive = true;
             Object activeObj = r.get("is_active");
@@ -469,7 +576,10 @@ public class TherapistService {
                 isActive = ((Number) activeObj).intValue() == 1;
             }
 
-            result.add(new TherapistCaregiverSummaryItem(
+            int pendingReviews = pendingRev != null ? pendingRev : 0;
+            int unreadMsgs = unreadMessages != null ? unreadMessages : 0;
+
+            TherapistCaregiverSummaryItem item = new TherapistCaregiverSummaryItem(
                     caregiverId,
                     (String) r.get("full_name"),
                     (String) r.get("email"),
@@ -479,9 +589,28 @@ public class TherapistService {
                     childId,
                     (String) r.get("child_name"),
                     activeHp != null ? activeHp : 0,
-                    pendingRev != null ? pendingRev : 0
-            ));
+                    pendingReviews
+            );
+            item.setLastMessage(lastMsg);
+            item.setLastMessageAt(lastMsgAtIso);
+            item.setLastSenderId(lastSenderId);
+            item.setUnreadMessagesCount(unreadMsgs);
+            result.add(item);
         }
+
+        // Order by most recent message first; contacts without messages stay below alphabetically
+        result.sort((a, b) -> {
+            String ta = a.getLastMessageAt();
+            String tb = b.getLastMessageAt();
+            if (ta == null && tb == null) {
+                String na = a.getFullName() != null ? a.getFullName() : "";
+                String nb = b.getFullName() != null ? b.getFullName() : "";
+                return na.compareToIgnoreCase(nb);
+            }
+            if (ta == null) return 1;
+            if (tb == null) return -1;
+            return tb.compareTo(ta);
+        });
         return result;
     }
 

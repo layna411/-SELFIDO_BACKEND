@@ -1,5 +1,6 @@
 package com.simats.selfora.dto;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import java.time.LocalDateTime;
 
 public class NotificationDtos {
@@ -11,7 +12,10 @@ public class NotificationDtos {
         private String message;
         private String notificationType;
         private Long referenceId;
+
+        @JsonProperty("isRead")
         private Boolean isRead;
+
         private LocalDateTime createdAt;
 
         public NotificationItemResponse() {}
@@ -33,7 +37,14 @@ public class NotificationDtos {
         public String getMessage() { return message; }
         public String getNotificationType() { return notificationType; }
         public Long getReferenceId() { return referenceId; }
+
+        @JsonProperty("isRead")
         public Boolean getIsRead() { return isRead; }
+
+        @JsonProperty("read")
+        public Boolean getRead() { return isRead; }
+
+        public void setIsRead(Boolean isRead) { this.isRead = isRead; }
         public LocalDateTime getCreatedAt() { return createdAt; }
     }
 }

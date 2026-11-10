@@ -77,6 +77,7 @@ public class CaregiverPracticeDtos {
     }
 
     public static class TherapistReviewRequest {
+        @com.fasterxml.jackson.annotation.JsonAlias("therapistFeedback")
         private String feedbackText;
         private String status; // REVIEWED, FLAGGED
         private Boolean flaggedForFollowup;

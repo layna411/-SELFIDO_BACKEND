@@ -164,12 +164,52 @@ public class HomeProgramService {
         return programs.stream().map(this::mapToResponse).collect(Collectors.toList());
     }
 
+    @org.springframework.transaction.annotation.Transactional(readOnly = true)
+    public List<HomeProgramDtos.HomeProgramResponse> getAssignedHomeProgramsForCurrentUser() {
+        String username = SecurityContextHolder.getContext().getAuthentication().getName();
+        User currentUser = userRepository.findByUsername(username)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found: " + username));
+
+        boolean isAdmin = currentUser.getRoles().stream()
+                .anyMatch(r -> "ROLE_ADMIN".equalsIgnoreCase(r.getName()) || "ROLE_SUPER_ADMIN".equalsIgnoreCase(r.getName()));
+        boolean isTherapist = currentUser.getRoles().stream()
+                .anyMatch(r -> "ROLE_THERAPIST".equalsIgnoreCase(r.getName()));
+
+        if (!isAdmin && !isTherapist) {
+            return getHomeProgramsForCaregiver();
+        }
+
+        List<HomeProgram> programs;
+        if (isAdmin) {
+            programs = homeProgramRepository.findByIsActiveTrueOrderByCreatedAtDesc();
+        } else {
+            List<Long> childIds = childRepository.findByTherapistId(currentUser.getId()).stream()
+                    .map(Child::getId)
+                    .collect(Collectors.toList());
+            if (childIds.isEmpty()) {
+                return Collections.emptyList();
+            }
+            programs = homeProgramRepository.findByChildIdInAndIsActiveTrueOrderByCreatedAtDesc(childIds);
+        }
+
+        return programs.stream()
+                .filter(p -> p.getChild() != null && (p.getChild().getIsActive() == null || Boolean.TRUE.equals(p.getChild().getIsActive())))
+                .filter(p -> {
+                    String st = p.getStatus();
+                    return st == null || (!"COMPLETED".equalsIgnoreCase(st) && !"CANCELLED".equalsIgnoreCase(st) && !"PAUSED".equalsIgnoreCase(st));
+                })
+                .map(this::mapToResponse)
+                .collect(Collectors.toList());
+    }
+
     private HomeProgramDtos.HomeProgramResponse mapToResponse(HomeProgram p) {
-        List<ActivityDtos.TaskStepResponse> stepDtos = p.getTargetSteps().stream()
-                .sorted(Comparator.comparing(TaskStep::getStepNumber))
+        Set<TaskStep> rawSteps = p.getTargetSteps() != null ? p.getTargetSteps() : Collections.emptySet();
+        List<ActivityDtos.TaskStepResponse> stepDtos = rawSteps.stream()
+                .filter(Objects::nonNull)
+                .sorted(Comparator.comparing(TaskStep::getStepNumber, Comparator.nullsLast(Comparator.naturalOrder())))
                 .map(s -> ActivityDtos.TaskStepResponse.builder()
                         .id(s.getId())
-                        .activityId(s.getActivity().getId())
+                        .activityId(s.getActivity() != null ? s.getActivity().getId() : null)
                         .stepNumber(s.getStepNumber())
                         .title(s.getTitle())
                         .instructionText(s.getInstructionText())
@@ -178,18 +218,25 @@ public class HomeProgramService {
                         .build())
                 .collect(Collectors.toList());
 
-        String therapistName = p.getTherapist() != null ? p.getTherapist().getFirstName() + " " + p.getTherapist().getLastName() : "Therapist";
+        String therapistName = p.getTherapist() != null && p.getTherapist().getFullName() != null
+                ? p.getTherapist().getFullName()
+                : "Therapist";
+        String childFirst = p.getChild() != null && p.getChild().getFirstName() != null ? p.getChild().getFirstName() : "Child";
+        String childLast = p.getChild() != null && p.getChild().getLastName() != null && !p.getChild().getLastName().isBlank()
+                ? " " + p.getChild().getLastName() : "";
+        String childName = childFirst + childLast;
         String promptLevelName = p.getTargetPromptLevel() != null ? p.getTargetPromptLevel().getLevelName() : "Visual Prompt";
+        String actTitle = p.getActivity() != null ? p.getActivity().getTitle() : "ADL Activity";
 
         return HomeProgramDtos.HomeProgramResponse.builder()
                 .id(p.getId())
-                .childId(p.getChild().getId())
-                .childName(p.getChild().getFirstName() + " " + p.getChild().getLastName())
-                .therapistId(p.getTherapist().getId())
+                .childId(p.getChild() != null ? p.getChild().getId() : null)
+                .childName(childName)
+                .therapistId(p.getTherapist() != null ? p.getTherapist().getId() : null)
                 .therapistName(therapistName)
-                .activityId(p.getActivity().getId())
-                .activityTitle(p.getActivity().getTitle())
-                .title(p.getTitle() != null ? p.getTitle() : p.getActivity().getTitle() + " Practice")
+                .activityId(p.getActivity() != null ? p.getActivity().getId() : null)
+                .activityTitle(actTitle)
+                .title(p.getTitle() != null ? p.getTitle() : actTitle + " Practice")
                 .description(p.getDescription())
                 .status(p.getStatus() != null ? p.getStatus() : "ACTIVE")
                 .priority(p.getPriority() != null ? p.getPriority() : "NORMAL")

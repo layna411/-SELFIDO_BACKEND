@@ -425,6 +425,10 @@ public class TherapistDtos {
         private String childName;
         private int activeHomeProgramsCount;
         private int pendingPracticeReviewsCount;
+        private String lastMessage;
+        private String lastMessageAt;
+        private Long lastSenderId;
+        private int unreadMessagesCount;
 
         public TherapistCaregiverSummaryItem() {}
 
@@ -470,5 +474,17 @@ public class TherapistDtos {
 
         public int getPendingPracticeReviewsCount() { return pendingPracticeReviewsCount; }
         public void setPendingPracticeReviewsCount(int pendingPracticeReviewsCount) { this.pendingPracticeReviewsCount = pendingPracticeReviewsCount; }
+
+        public String getLastMessage() { return lastMessage; }
+        public void setLastMessage(String lastMessage) { this.lastMessage = lastMessage; }
+
+        public String getLastMessageAt() { return lastMessageAt; }
+        public void setLastMessageAt(String lastMessageAt) { this.lastMessageAt = lastMessageAt; }
+
+        public Long getLastSenderId() { return lastSenderId; }
+        public void setLastSenderId(Long lastSenderId) { this.lastSenderId = lastSenderId; }
+
+        public int getUnreadMessagesCount() { return unreadMessagesCount; }
+        public void setUnreadMessagesCount(int unreadMessagesCount) { this.unreadMessagesCount = unreadMessagesCount; }
     }
 }
