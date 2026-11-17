@@ -174,7 +174,7 @@ public class ProgressAnalyticsService {
 
         String trend = currentIndepPct > previousIndepPct ? "IMPROVING" : (currentIndepPct < previousIndepPct ? "REGRESSING" : "STABLE");
 
-        // 4 ADL Activity Cards (Dressing, Eating, Grooming, Shoes & Socks)
+        // 3 ADL Activity Cards (Dressing, Eating, Shoes & Socks)
         List<ProgressDtos.ActivityPerformanceCardDto> activityCards = buildActivityPerformanceCards(childId);
 
         // Difficult Steps
@@ -240,24 +240,63 @@ public class ProgressAnalyticsService {
         return ((double) independentCount / records.size()) * 100.0;
     }
 
+    private boolean isActivityInCategory(Activity activity, String catName) {
+        if (activity == null) return false;
+        String title = activity.getTitle() != null ? activity.getTitle().toLowerCase() : "";
+        Long catId = activity.getCategory() != null ? activity.getCategory().getId() : null;
+        String catNameDb = activity.getCategory() != null && activity.getCategory().getName() != null
+                ? activity.getCategory().getName().toLowerCase() : "";
+
+        if ("Dressing".equalsIgnoreCase(catName)) {
+            return (catId != null && (catId == 1L || catId == 2L || catId == 3L || catId == 4L))
+                    || (!title.contains("shoe") && !title.contains("sock") && catNameDb.contains("dressing"))
+                    || title.contains("shirt") || title.contains("jacket") || title.contains("trouser")
+                    || title.contains("short") || title.contains("frock") || title.contains("vest")
+                    || title.contains("top") || title.contains("skirt") || title.contains("brief")
+                    || title.contains("panties") || title.contains("camisole");
+        } else if ("Eating".equalsIgnoreCase(catName)) {
+            return (catId != null && catId == 6L) || catNameDb.contains("eating")
+                    || title.contains("eat") || title.contains("spoon") || title.contains("rice")
+                    || title.contains("breakfast");
+        } else { // Shoes & Socks
+            return (catId != null && catId == 5L)
+                    || title.contains("shoe") || title.contains("sock")
+                    || (activity.getCategory() != null && activity.getCategory().getSubCategory() != null
+                    && activity.getCategory().getSubCategory().toLowerCase().contains("footwear"));
+        }
+    }
+
+    private double calculateAssessmentIndependence(Assessment assessment) {
+        if (assessment == null) return 0.0;
+        List<com.simats.selfora.entity.AssessmentResult> results = assessmentResultRepository.findByAssessmentId(assessment.getId());
+        if (results == null || results.isEmpty()) return 0.0;
+        long indCount = results.stream()
+                .filter(r -> r.getBaselinePromptLevel() != null && r.getBaselinePromptLevel().getId() == 0)
+                .count();
+        return ((double) indCount / results.size()) * 100.0;
+    }
+
     private List<ProgressDtos.ActivityPerformanceCardDto> buildActivityPerformanceCards(Long childId) {
         List<ProgressDtos.ActivityPerformanceCardDto> cards = new ArrayList<>();
 
         Map<String, String> categoryMap = new LinkedHashMap<>();
         categoryMap.put("Dressing", "Dressing");
         categoryMap.put("Eating", "Eating");
-        categoryMap.put("Grooming", "Grooming");
         categoryMap.put("Shoes & Socks", "Shoes & Socks");
+
+        List<TherapySession> allSessions = therapySessionRepository.findByChildId(childId);
+        List<Assessment> allAssessments = assessmentRepository.findByChildIdOrderByAssessmentDateDesc(childId);
 
         for (Map.Entry<String, String> entry : categoryMap.entrySet()) {
             String cat = entry.getKey();
-            List<TherapySession> sList = therapySessionRepository.findByChildId(childId).stream()
-                    .filter(s -> s.getActivity() != null && s.getActivity().getTitle().toLowerCase().contains(cat.toLowerCase()))
+            List<TherapySession> sList = allSessions.stream()
+                    .filter(s -> isActivityInCategory(s.getActivity(), cat))
                     .collect(Collectors.toList());
 
             double curPct = 0.0;
             double prevPct = 0.0;
             String trendStr = "STABLE";
+            int count = sList.size();
 
             if (!sList.isEmpty()) {
                 curPct = calculateSessionIndependence(sList.get(0));
@@ -268,10 +307,20 @@ public class ProgressAnalyticsService {
                     prevPct = 0.0;
                     trendStr = curPct > 0 ? "IMPROVING" : "STABLE";
                 }
+            } else {
+                // Check if baseline clinical assessment exists for this category
+                List<Assessment> catAssessments = allAssessments.stream()
+                        .filter(a -> isActivityInCategory(a.getActivity(), cat))
+                        .collect(Collectors.toList());
+                if (!catAssessments.isEmpty()) {
+                    curPct = calculateAssessmentIndependence(catAssessments.get(0));
+                    trendStr = "BASELINE";
+                    count = catAssessments.size();
+                }
             }
 
             cards.add(new ProgressDtos.ActivityPerformanceCardDto(
-                    cat, Math.round(curPct * 10.0) / 10.0, Math.round(prevPct * 10.0) / 10.0, trendStr, sList.size()
+                    cat, Math.round(curPct * 10.0) / 10.0, Math.round(prevPct * 10.0) / 10.0, trendStr, count
             ));
         }
 

@@ -91,9 +91,8 @@ public class AdminService {
         sessionMap.put("Sun", 8L);
 
         Map<String, Long> adlMap = new LinkedHashMap<>();
-        adlMap.put("Dressing", 45L);
-        adlMap.put("Eating", 30L);
-        adlMap.put("Grooming", 15L);
+        adlMap.put("Dressing", 55L);
+        adlMap.put("Eating", 35L);
         adlMap.put("Shoes & Socks", 10L);
 
         return new AdminDtos.ChartData(regMap, sessionMap, adlMap);
@@ -444,7 +443,7 @@ public class AdminService {
         AdminDtos.AdminChildDetailProfile profile = new AdminDtos.AdminChildDetailProfile();
         profile.setSummary(summary);
         profile.setDiagnosisNotes(child.getDiagnosisNotes() != null && !child.getDiagnosisNotes().isBlank() ? child.getDiagnosisNotes() : "No diagnosis notes recorded.");
-        profile.setSupportedAdlCategories(Arrays.asList("Dressing", "Eating", "Grooming", "Shoes & Socks"));
+        profile.setSupportedAdlCategories(Arrays.asList("Dressing", "Eating", "Shoes & Socks"));
 
         long sessions = 0;
         try {

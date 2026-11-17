@@ -270,11 +270,11 @@ public class TherapistDtos {
         private String caregiverRelationship;
         private String lastSessionDate = "No recent session";
         private String programmeStatus = "ACTIVE";
-        private int assignedGoalsCount = 3;
+        private int assignedGoalsCount = 0;
         private int dressingPercentage;
         private int eatingPercentage;
         private int shoesPercentage;
-        private int overallProgressPercentage = 75;
+        private int overallProgressPercentage = 0;
         private Boolean hasPendingAssessment;
         private Boolean hasActiveHomeProgram;
 

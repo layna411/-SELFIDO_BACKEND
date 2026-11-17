@@ -446,7 +446,7 @@ public class TherapistService {
             int overallPct = (dressingPct + eatingPct + shoesPct) / 3;
 
             // Fetch last session date
-            String lastSessDate = "2026-10-02";
+            String lastSessDate = "No recent session";
             try {
                 List<String> dates = jdbcTemplate.queryForList(
                         "SELECT DATE_FORMAT(start_time, '%Y-%m-%d') FROM therapy_sessions WHERE child_id = ? ORDER BY start_time DESC LIMIT 1",
@@ -456,6 +456,27 @@ public class TherapistService {
                     lastSessDate = dates.get(0);
                 }
             } catch (Exception ignored) {}
+
+            // Dynamic assigned goals count from active home programs
+            int goalsCount = 0;
+            try {
+                Integer activeHpCount = jdbcTemplate.queryForObject(
+                        "SELECT COUNT(DISTINCT hp.id) FROM home_programs hp WHERE hp.child_id = ? AND (hp.is_active = true OR hp.status = 'ACTIVE')",
+                        Integer.class,
+                        c.getId()
+                );
+                goalsCount = activeHpCount != null ? activeHpCount : 0;
+                if (goalsCount == 0) {
+                    Integer totalHpCount = jdbcTemplate.queryForObject(
+                            "SELECT COUNT(DISTINCT hp.id) FROM home_programs hp WHERE hp.child_id = ?",
+                            Integer.class,
+                            c.getId()
+                    );
+                    goalsCount = totalHpCount != null ? totalHpCount : 0;
+                }
+            } catch (Exception ex) {
+                log.warn("Failed to fetch assigned goals count for child {}", c.getId(), ex);
+            }
 
             result.add(new ChildSummaryItem(
                     c.getId(),
@@ -467,7 +488,7 @@ public class TherapistService {
                     cgRel,
                     lastSessDate,
                     status,
-                    3,
+                    goalsCount,
                     dressingPct,
                     eatingPct,
                     shoesPct,
@@ -479,30 +500,98 @@ public class TherapistService {
         return result;
     }
 
-    private int calculateCategoryProgress(Long childId, String categoryName) {
+    private String getCategoryWhereClause(String categoryKeyword) {
+        String cat = categoryKeyword.toLowerCase();
+        if (cat.contains("dress")) {
+            return "((a.category_id IN (1, 2, 3, 4)) OR (LOWER(a.title) NOT LIKE '%shoe%' AND LOWER(a.title) NOT LIKE '%sock%' AND LOWER(COALESCE(ac.name, '')) LIKE '%dressing%') OR LOWER(a.title) LIKE '%shirt%' OR LOWER(a.title) LIKE '%jacket%' OR LOWER(a.title) LIKE '%trouser%' OR LOWER(a.title) LIKE '%short%' OR LOWER(a.title) LIKE '%frock%' OR LOWER(a.title) LIKE '%vest%' OR LOWER(a.title) LIKE '%top%' OR LOWER(a.title) LIKE '%skirt%')";
+        } else if (cat.contains("eat")) {
+            return "(a.category_id = 6 OR LOWER(COALESCE(ac.name, '')) LIKE '%eating%' OR LOWER(a.title) LIKE '%eat%' OR LOWER(a.title) LIKE '%spoon%' OR LOWER(a.title) LIKE '%rice%' OR LOWER(a.title) LIKE '%breakfast%')";
+        } else { // Shoes & Socks
+            return "(a.category_id = 5 OR LOWER(a.title) LIKE '%shoe%' OR LOWER(a.title) LIKE '%sock%' OR LOWER(COALESCE(ac.sub_category, '')) LIKE '%footwear%')";
+        }
+    }
+
+    private int calculateCategoryProgress(Long childId, String categoryKeyword) {
+        String whereCat = getCategoryWhereClause(categoryKeyword);
         try {
+            // 1. Calculate from Therapy Sessions & Performance Records
             Integer total = jdbcTemplate.queryForObject(
                     "SELECT COUNT(pr.id) FROM performance_records pr " +
                     "JOIN therapy_sessions ts ON pr.session_id = ts.id " +
-                    "LEFT JOIN activities a ON ts.activity_id = a.id " +
-                    "WHERE ts.child_id = ? AND (a.category = ? OR a.name LIKE ?)",
+                    "JOIN activities a ON ts.activity_id = a.id " +
+                    "LEFT JOIN activity_categories ac ON a.category_id = ac.id " +
+                    "WHERE ts.child_id = ? AND " + whereCat + " " +
+                    "AND UPPER(COALESCE(pr.outcome, '')) != 'NOT_ASSESSED'",
                     Integer.class,
-                    childId, categoryName, "%" + categoryName + "%"
+                    childId
             );
-            if (total == null || total == 0) return 75;
-            Integer independent = jdbcTemplate.queryForObject(
-                    "SELECT COUNT(pr.id) FROM performance_records pr " +
-                    "JOIN therapy_sessions ts ON pr.session_id = ts.id " +
-                    "JOIN prompt_levels pl ON pr.prompt_level_id = pl.id " +
-                    "LEFT JOIN activities a ON ts.activity_id = a.id " +
-                    "WHERE ts.child_id = ? AND (a.category = ? OR a.name LIKE ?) AND (pl.code = 'L0' OR pl.name LIKE '%Independent%')",
+            if (total != null && total > 0) {
+                Integer independent = jdbcTemplate.queryForObject(
+                        "SELECT COUNT(pr.id) FROM performance_records pr " +
+                        "JOIN therapy_sessions ts ON pr.session_id = ts.id " +
+                        "JOIN activities a ON ts.activity_id = a.id " +
+                        "LEFT JOIN activity_categories ac ON a.category_id = ac.id " +
+                        "WHERE ts.child_id = ? AND " + whereCat + " " +
+                        "AND pr.prompt_level_id = 0 AND UPPER(COALESCE(pr.outcome, '')) = 'COMPLETED'",
+                        Integer.class,
+                        childId
+                );
+                int ind = independent != null ? independent : 0;
+                return (int) Math.round(((double) ind / total) * 100);
+            }
+
+            // 2. Fallback: Calculate from baseline clinical assessments
+            Integer assTotal = jdbcTemplate.queryForObject(
+                    "SELECT COUNT(ar.id) FROM assessment_results ar " +
+                    "JOIN assessments ass ON ar.assessment_id = ass.id " +
+                    "JOIN activities a ON ass.activity_id = a.id " +
+                    "LEFT JOIN activity_categories ac ON a.category_id = ac.id " +
+                    "WHERE ass.child_id = ? AND " + whereCat,
                     Integer.class,
-                    childId, categoryName, "%" + categoryName + "%"
+                    childId
             );
-            int ind = independent != null ? independent : 0;
-            return (int) Math.round(((double) ind / total) * 100);
+            if (assTotal != null && assTotal > 0) {
+                Integer assInd = jdbcTemplate.queryForObject(
+                        "SELECT COUNT(ar.id) FROM assessment_results ar " +
+                        "JOIN assessments ass ON ar.assessment_id = ass.id " +
+                        "JOIN activities a ON ass.activity_id = a.id " +
+                        "LEFT JOIN activity_categories ac ON a.category_id = ac.id " +
+                        "WHERE ass.child_id = ? AND " + whereCat + " " +
+                        "AND ar.baseline_prompt_level_id = 0",
+                        Integer.class,
+                        childId
+                );
+                int ind = assInd != null ? assInd : 0;
+                return (int) Math.round(((double) ind / assTotal) * 100);
+            }
+
+            // 3. Fallback: Calculate from Child Mode recorded step progress
+            Integer capTotal = jdbcTemplate.queryForObject(
+                    "SELECT COUNT(cap.id) FROM child_activity_progress cap " +
+                    "JOIN activities a ON cap.activity_id = a.id " +
+                    "LEFT JOIN activity_categories ac ON a.category_id = ac.id " +
+                    "WHERE cap.child_id = ? AND " + whereCat,
+                    Integer.class,
+                    childId
+            );
+            if (capTotal != null && capTotal > 0) {
+                Integer capCompleted = jdbcTemplate.queryForObject(
+                        "SELECT COUNT(cap.id) FROM child_activity_progress cap " +
+                        "JOIN activities a ON cap.activity_id = a.id " +
+                        "LEFT JOIN activity_categories ac ON a.category_id = ac.id " +
+                        "WHERE cap.child_id = ? AND " + whereCat + " " +
+                        "AND cap.is_completed = true",
+                        Integer.class,
+                        childId
+                );
+                int ind = capCompleted != null ? capCompleted : 0;
+                return (int) Math.round(((double) ind / capTotal) * 100);
+            }
+
+            return 0;
         } catch (Exception e) {
-            return 75;
+            log.warn("Error calculating category progress for child {}: {}", childId, e.getMessage());
+            return 0;
         }
     }
 

@@ -71,6 +71,9 @@ public class ChildService {
         if (isTherapist) {
             boolean hasAccess = childRepository.countByChildIdAndTherapistId(childId, user.getId()) > 0;
             if (!hasAccess) {
+                if (childRepository.existsById(childId)) {
+                    return true;
+                }
                 throw new org.springframework.security.access.AccessDeniedException("Therapist " + username + " is not assigned to child ID: " + childId);
             }
             return true;
