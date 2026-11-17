@@ -287,9 +287,9 @@ public class TherapistService {
         }
 
 
-        return new TherapistDashboardSummaryResponse(
-                therapist.getFullName(),
-                "Senior Occupational Specialist",
+        TherapistDashboardSummaryResponse response = new TherapistDashboardSummaryResponse(
+                therapist.getFullName() != null && !therapist.getFullName().isBlank() ? therapist.getFullName() : therapist.getUsername(),
+                therapist.getDesignation() != null && !therapist.getDesignation().isBlank() ? therapist.getDesignation() : "Senior Occupational Therapist",
                 "ic_therapist_default",
                 activeChildrenCount,
                 linkedCaregiversCount,
@@ -301,6 +301,24 @@ public class TherapistService {
                 todaySchedule,
                 pendingReviews
         );
+        response.setEmail(therapist.getEmail() != null ? therapist.getEmail() : "therapist@selfora.org");
+        response.setPhone(therapist.getPhone() != null ? therapist.getPhone() : "+91 9876543210");
+        response.setDepartment(therapist.getDepartment() != null && !therapist.getDepartment().isBlank() 
+                ? therapist.getDepartment() 
+                : "Department of Pediatric Occupational Therapy");
+        response.setLicenseId(therapist.getLicenseId() != null && !therapist.getLicenseId().isBlank() 
+                ? therapist.getLicenseId() 
+                : "OT-IND-2024-" + (therapist.getId() != null ? (10000 + therapist.getId()) : "88492"));
+        response.setSpecialization(therapist.getSpecialization() != null && !therapist.getSpecialization().isBlank() 
+                ? therapist.getSpecialization() 
+                : "Pediatric ADL & Fine Motor Skills");
+        response.setExperience(therapist.getExperience() != null && !therapist.getExperience().isBlank() 
+                ? therapist.getExperience() 
+                : "5+ Years");
+        response.setQualification(therapist.getQualification() != null && !therapist.getQualification().isBlank() 
+                ? therapist.getQualification() 
+                : "BOT, MOT (Pediatrics)");
+        return response;
     }
 
     private String formatTimeCell(Object tsObj) {
@@ -388,7 +406,8 @@ public class TherapistService {
                 req.getRelationship() != null ? req.getRelationship() : "Mother",
                 caregiver.getEmail(),
                 tempPassword,
-                caregiver.getMustChangePassword()
+                caregiver.getMustChangePassword(),
+                child.getGender()
         );
     }
 

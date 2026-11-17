@@ -50,7 +50,7 @@ public class CaregiverService {
             int age = c.getDateOfBirth() != null ? Period.between(c.getDateOfBirth(), LocalDate.now()).getYears() : 6;
             String fullName = c.getFirstName() + (c.getLastName() == null || c.getLastName().isBlank() ? "" : " " + c.getLastName());
 
-            String thName = "Dr. Sarah Jenkins";
+            String thName = "Occupational Therapist";
             try {
                 List<String> thNames = jdbcTemplate.queryForList(
                         "SELECT u.full_name FROM users u JOIN therapist_children tc ON u.id = tc.therapist_id WHERE tc.child_id = ? LIMIT 1",

@@ -11,6 +11,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
@@ -199,10 +200,33 @@ public class CaregiverPracticeService {
     }
 
     public List<CaregiverPracticeDtos.CaregiverPracticeSessionResponse> getPracticeHistoryForChild(Long childId) {
-        childService.validateChildAccessForCurrentUser(childId);
-        return practiceSessionRepository.findByChildIdOrderByPracticeDateDesc(childId).stream()
-                .map(this::mapToResponse)
-                .collect(Collectors.toList());
+        String username = SecurityContextHolder.getContext().getAuthentication().getName();
+        User currentUser = userRepository.findByUsername(username).orElse(null);
+        Long resolvedChildId = childId;
+        if (currentUser != null && currentUser.getRoles().stream().anyMatch(r -> "ROLE_CAREGIVER".equalsIgnoreCase(r.getName()))) {
+            List<Child> linked = childRepository.findByCaregiverId(currentUser.getId());
+            if (!linked.isEmpty()) {
+                boolean hasMatch = false;
+                if (childId != null && childId > 0) {
+                    for (Child c : linked) {
+                        if (c.getId().equals(childId)) {
+                            hasMatch = true;
+                            break;
+                        }
+                    }
+                }
+                if (!hasMatch) {
+                    resolvedChildId = linked.get(0).getId();
+                }
+            }
+        }
+        if (resolvedChildId != null && resolvedChildId > 0) {
+            childService.validateChildAccessForCurrentUser(resolvedChildId);
+            return practiceSessionRepository.findByChildIdOrderByPracticeDateDesc(resolvedChildId).stream()
+                    .map(this::mapToResponse)
+                    .collect(Collectors.toList());
+        }
+        return Collections.emptyList();
     }
 
     private CaregiverPracticeDtos.CaregiverPracticeSessionResponse mapToResponse(CaregiverPracticeSession s) {

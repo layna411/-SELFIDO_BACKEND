@@ -85,6 +85,8 @@ public class AdminDtos {
         private String username;
         private String password;
         private String designation;
+        private String department;
+        private String licenseId;
         private String specialization;
         private String qualification;
         private String experience;
@@ -109,6 +111,12 @@ public class AdminDtos {
         public String getDesignation() { return designation; }
         public void setDesignation(String designation) { this.designation = designation; }
 
+        public String getDepartment() { return department; }
+        public void setDepartment(String department) { this.department = department; }
+
+        public String getLicenseId() { return licenseId; }
+        public void setLicenseId(String licenseId) { this.licenseId = licenseId; }
+
         public String getSpecialization() { return specialization; }
         public void setSpecialization(String specialization) { this.specialization = specialization; }
 
@@ -126,6 +134,8 @@ public class AdminDtos {
         private String email;
         private String phone;
         private String designation;
+        private String department;
+        private String licenseId;
         private String specialization;
         private String qualification;
         private String experience;
@@ -154,6 +164,12 @@ public class AdminDtos {
 
         public String getDesignation() { return designation; }
         public void setDesignation(String designation) { this.designation = designation; }
+
+        public String getDepartment() { return department; }
+        public void setDepartment(String department) { this.department = department; }
+
+        public String getLicenseId() { return licenseId; }
+        public void setLicenseId(String licenseId) { this.licenseId = licenseId; }
 
         public String getSpecialization() { return specialization; }
         public void setSpecialization(String specialization) { this.specialization = specialization; }
@@ -185,6 +201,8 @@ public class AdminDtos {
         private String email;
         private String phone;
         private String designation;
+        private String department;
+        private String licenseId;
         private String specialization;
         private String qualification;
         private String experience;
@@ -202,6 +220,12 @@ public class AdminDtos {
 
         public String getDesignation() { return designation; }
         public void setDesignation(String designation) { this.designation = designation; }
+
+        public String getDepartment() { return department; }
+        public void setDepartment(String department) { this.department = department; }
+
+        public String getLicenseId() { return licenseId; }
+        public void setLicenseId(String licenseId) { this.licenseId = licenseId; }
 
         public String getSpecialization() { return specialization; }
         public void setSpecialization(String specialization) { this.specialization = specialization; }

@@ -91,6 +91,7 @@ public class HomeProgramDtos {
         private Long id;
         private Long childId;
         private String childName;
+        private String childGender;
         private Long therapistId;
         private String therapistName;
         private Long activityId;
@@ -125,6 +126,7 @@ public class HomeProgramDtos {
             private Long id;
             private Long childId;
             private String childName;
+            private String childGender;
             private Long therapistId;
             private String therapistName;
             private Long activityId;
@@ -154,6 +156,7 @@ public class HomeProgramDtos {
             public Builder id(Long id) { this.id = id; return this; }
             public Builder childId(Long childId) { this.childId = childId; return this; }
             public Builder childName(String childName) { this.childName = childName; return this; }
+            public Builder childGender(String childGender) { this.childGender = childGender; return this; }
             public Builder therapistId(Long therapistId) { this.therapistId = therapistId; return this; }
             public Builder therapistName(String therapistName) { this.therapistName = therapistName; return this; }
             public Builder activityId(Long activityId) { this.activityId = activityId; return this; }
@@ -185,6 +188,7 @@ public class HomeProgramDtos {
                 res.id = id;
                 res.childId = childId;
                 res.childName = childName;
+                res.childGender = childGender;
                 res.therapistId = therapistId;
                 res.therapistName = therapistName;
                 res.activityId = activityId;
@@ -217,6 +221,7 @@ public class HomeProgramDtos {
         public Long getId() { return id; }
         public Long getChildId() { return childId; }
         public String getChildName() { return childName; }
+        public String getChildGender() { return childGender; }
         public Long getTherapistId() { return therapistId; }
         public String getTherapistName() { return therapistName; }
         public Long getActivityId() { return activityId; }

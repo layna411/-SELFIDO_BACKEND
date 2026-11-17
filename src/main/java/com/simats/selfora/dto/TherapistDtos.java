@@ -72,10 +72,15 @@ public class TherapistDtos {
         private String caregiverEmail;
         private String temporaryPassword;
         private Boolean mustChangePassword;
+        private String gender;
 
         public CredentialsSuccessResponse() {}
 
         public CredentialsSuccessResponse(Long childId, String childName, Long caregiverId, String caregiverName, String relationship, String caregiverEmail, String temporaryPassword, Boolean mustChangePassword) {
+            this(childId, childName, caregiverId, caregiverName, relationship, caregiverEmail, temporaryPassword, mustChangePassword, "BOY");
+        }
+
+        public CredentialsSuccessResponse(Long childId, String childName, Long caregiverId, String caregiverName, String relationship, String caregiverEmail, String temporaryPassword, Boolean mustChangePassword, String gender) {
             this.childId = childId;
             this.childName = childName;
             this.caregiverId = caregiverId;
@@ -84,7 +89,11 @@ public class TherapistDtos {
             this.caregiverEmail = caregiverEmail;
             this.temporaryPassword = temporaryPassword;
             this.mustChangePassword = mustChangePassword;
+            this.gender = gender;
         }
+
+        public String getGender() { return gender; }
+        public void setGender(String gender) { this.gender = gender; }
 
         public Long getChildId() { return childId; }
         public void setChildId(Long childId) { this.childId = childId; }
@@ -205,6 +214,13 @@ public class TherapistDtos {
         private int pendingReviewsCount;
         private List<ScheduledSessionItem> todaySchedule = new ArrayList<>();
         private List<PendingReviewItem> pendingReviews = new ArrayList<>();
+        private String email;
+        private String phone;
+        private String department;
+        private String licenseId;
+        private String specialization;
+        private String experience;
+        private String qualification;
 
         public TherapistDashboardSummaryResponse() {}
 
@@ -258,6 +274,27 @@ public class TherapistDtos {
 
         public List<PendingReviewItem> getPendingReviews() { return pendingReviews; }
         public void setPendingReviews(List<PendingReviewItem> pendingReviews) { this.pendingReviews = pendingReviews; }
+
+        public String getEmail() { return email; }
+        public void setEmail(String email) { this.email = email; }
+
+        public String getPhone() { return phone; }
+        public void setPhone(String phone) { this.phone = phone; }
+
+        public String getDepartment() { return department; }
+        public void setDepartment(String department) { this.department = department; }
+
+        public String getLicenseId() { return licenseId; }
+        public void setLicenseId(String licenseId) { this.licenseId = licenseId; }
+
+        public String getSpecialization() { return specialization; }
+        public void setSpecialization(String specialization) { this.specialization = specialization; }
+
+        public String getExperience() { return experience; }
+        public void setExperience(String experience) { this.experience = experience; }
+
+        public String getQualification() { return qualification; }
+        public void setQualification(String qualification) { this.qualification = qualification; }
     }
 
     public static class ChildSummaryItem {

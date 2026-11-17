@@ -42,4 +42,10 @@ public class CaregiverPracticeController {
     public ResponseEntity<List<CaregiverPracticeDtos.CaregiverPracticeSessionResponse>> getPracticeHistory(@PathVariable Long childId) {
         return ResponseEntity.ok(caregiverPracticeService.getPracticeHistoryForChild(childId));
     }
+
+    @GetMapping({"/history", "/history/current"})
+    @PreAuthorize("hasRole('CAREGIVER') or hasRole('THERAPIST') or hasRole('SUPER_ADMIN')")
+    public ResponseEntity<List<CaregiverPracticeDtos.CaregiverPracticeSessionResponse>> getCurrentCaregiverPracticeHistory() {
+        return ResponseEntity.ok(caregiverPracticeService.getPracticeHistoryForChild(null));
+    }
 }

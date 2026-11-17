@@ -38,6 +38,24 @@ public class User {
     @Column(name = "must_change_password")
     private Boolean mustChangePassword = false;
 
+    @Column(length = 150)
+    private String designation;
+
+    @Column(length = 150)
+    private String department;
+
+    @Column(name = "license_id", length = 100)
+    private String licenseId;
+
+    @Column(length = 255)
+    private String specialization;
+
+    @Column(length = 100)
+    private String experience;
+
+    @Column(length = 150)
+    private String qualification;
+
     @ManyToMany(fetch = FetchType.EAGER)
     @JoinTable(
         name = "user_roles",
@@ -81,6 +99,12 @@ public class User {
         private String profilePhotoUrl;
         private Boolean isActive = true;
         private Boolean mustChangePassword = false;
+        private String designation;
+        private String department;
+        private String licenseId;
+        private String specialization;
+        private String experience;
+        private String qualification;
         private Set<Role> roles = new HashSet<>();
         private LocalDateTime createdAt;
         private LocalDateTime updatedAt;
@@ -94,12 +118,25 @@ public class User {
         public Builder profilePhotoUrl(String profilePhotoUrl) { this.profilePhotoUrl = profilePhotoUrl; return this; }
         public Builder isActive(Boolean isActive) { this.isActive = isActive; return this; }
         public Builder mustChangePassword(Boolean mustChangePassword) { this.mustChangePassword = mustChangePassword; return this; }
+        public Builder designation(String designation) { this.designation = designation; return this; }
+        public Builder department(String department) { this.department = department; return this; }
+        public Builder licenseId(String licenseId) { this.licenseId = licenseId; return this; }
+        public Builder specialization(String specialization) { this.specialization = specialization; return this; }
+        public Builder experience(String experience) { this.experience = experience; return this; }
+        public Builder qualification(String qualification) { this.qualification = qualification; return this; }
         public Builder roles(Set<Role> roles) { this.roles = roles; return this; }
         public Builder createdAt(LocalDateTime createdAt) { this.createdAt = createdAt; return this; }
         public Builder updatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; return this; }
 
         public User build() {
-            return new User(id, username, passwordHash, fullName, email, phone, profilePhotoUrl, isActive, mustChangePassword, roles, createdAt, updatedAt);
+            User u = new User(id, username, passwordHash, fullName, email, phone, profilePhotoUrl, isActive, mustChangePassword, roles, createdAt, updatedAt);
+            u.setDesignation(designation);
+            u.setDepartment(department);
+            u.setLicenseId(licenseId);
+            u.setSpecialization(specialization);
+            u.setExperience(experience);
+            u.setQualification(qualification);
+            return u;
         }
     }
 
@@ -161,4 +198,22 @@ public class User {
 
     public LocalDateTime getUpdatedAt() { return updatedAt; }
     public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
+
+    public String getDesignation() { return designation; }
+    public void setDesignation(String designation) { this.designation = designation; }
+
+    public String getDepartment() { return department; }
+    public void setDepartment(String department) { this.department = department; }
+
+    public String getLicenseId() { return licenseId; }
+    public void setLicenseId(String licenseId) { this.licenseId = licenseId; }
+
+    public String getSpecialization() { return specialization; }
+    public void setSpecialization(String specialization) { this.specialization = specialization; }
+
+    public String getExperience() { return experience; }
+    public void setExperience(String experience) { this.experience = experience; }
+
+    public String getQualification() { return qualification; }
+    public void setQualification(String qualification) { this.qualification = qualification; }
 }

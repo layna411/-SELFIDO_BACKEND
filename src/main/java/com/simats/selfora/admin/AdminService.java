@@ -105,10 +105,12 @@ public class AdminService {
         dto.setFullName(u.getFullName());
         dto.setEmail(u.getEmail());
         dto.setPhone(u.getPhone() != null && !u.getPhone().isBlank() ? u.getPhone() : "+91 9876543210");
-        dto.setDesignation("Senior Occupational Therapist");
-        dto.setSpecialization("Pediatric ADL & Fine Motor Skills");
-        dto.setQualification("BOT, MOT (Pediatrics)");
-        dto.setExperience("5 Years");
+        dto.setDesignation(u.getDesignation() != null && !u.getDesignation().isBlank() ? u.getDesignation() : "Senior Occupational Therapist");
+        dto.setDepartment(u.getDepartment() != null && !u.getDepartment().isBlank() ? u.getDepartment() : "Department of Pediatric Occupational Therapy");
+        dto.setLicenseId(u.getLicenseId() != null && !u.getLicenseId().isBlank() ? u.getLicenseId() : "OT-IND-2024-" + (u.getId() != null ? (10000 + u.getId()) : "88492"));
+        dto.setSpecialization(u.getSpecialization() != null && !u.getSpecialization().isBlank() ? u.getSpecialization() : "Pediatric ADL & Fine Motor Skills");
+        dto.setQualification(u.getQualification() != null && !u.getQualification().isBlank() ? u.getQualification() : "BOT, MOT (Pediatrics)");
+        dto.setExperience(u.getExperience() != null && !u.getExperience().isBlank() ? u.getExperience() : "5 Years");
         dto.setIsActive(u.getIsActive());
         dto.setMustChangePassword(u.getMustChangePassword());
         dto.setCreatedAt(u.getCreatedAt());
@@ -161,6 +163,12 @@ public class AdminService {
                 .fullName(req.getFullName() != null ? req.getFullName().trim() : "")
                 .email(req.getEmail().trim())
                 .phone(req.getPhone())
+                .designation(req.getDesignation() != null && !req.getDesignation().isBlank() ? req.getDesignation().trim() : "Senior Occupational Therapist")
+                .department(req.getDepartment() != null && !req.getDepartment().isBlank() ? req.getDepartment().trim() : "Department of Pediatric Occupational Therapy")
+                .licenseId(req.getLicenseId() != null && !req.getLicenseId().isBlank() ? req.getLicenseId().trim() : null)
+                .specialization(req.getSpecialization() != null && !req.getSpecialization().isBlank() ? req.getSpecialization().trim() : "Pediatric ADL & Fine Motor Skills")
+                .qualification(req.getQualification() != null && !req.getQualification().isBlank() ? req.getQualification().trim() : "BOT, MOT (Pediatrics)")
+                .experience(req.getExperience() != null && !req.getExperience().isBlank() ? req.getExperience().trim() : "5 Years")
                 .isActive(true)
                 .mustChangePassword(true)
                 .roles(Collections.singleton(therapistRole))
@@ -187,6 +195,24 @@ public class AdminService {
         }
         if (req.getPhone() != null) {
             user.setPhone(req.getPhone().trim());
+        }
+        if (req.getDesignation() != null) {
+            user.setDesignation(req.getDesignation().trim());
+        }
+        if (req.getDepartment() != null) {
+            user.setDepartment(req.getDepartment().trim());
+        }
+        if (req.getLicenseId() != null) {
+            user.setLicenseId(req.getLicenseId().trim());
+        }
+        if (req.getSpecialization() != null) {
+            user.setSpecialization(req.getSpecialization().trim());
+        }
+        if (req.getQualification() != null) {
+            user.setQualification(req.getQualification().trim());
+        }
+        if (req.getExperience() != null) {
+            user.setExperience(req.getExperience().trim());
         }
 
         User saved = userRepository.save(user);

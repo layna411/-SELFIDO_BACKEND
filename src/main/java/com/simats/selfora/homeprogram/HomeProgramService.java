@@ -65,7 +65,15 @@ public class HomeProgramService {
         Set<TaskStep> steps = new HashSet<>();
         if (request.getTargetStepIds() != null && !request.getTargetStepIds().isEmpty()) {
             steps.addAll(taskStepRepository.findAllById(request.getTargetStepIds()));
-        } else {
+            if (steps.isEmpty()) {
+                List<TaskStep> actSteps = taskStepRepository.findByActivityIdOrderByStepNumberAsc(activity.getId());
+                for (Long tid : request.getTargetStepIds()) {
+                    int stepNum = (int) (tid > 1000 ? (tid % 1000) : tid);
+                    actSteps.stream().filter(s -> s.getStepNumber() != null && s.getStepNumber() == stepNum).findFirst().ifPresent(steps::add);
+                }
+            }
+        }
+        if (steps.isEmpty()) {
             steps.addAll(taskStepRepository.findByActivityIdOrderByStepNumberAsc(activity.getId()));
         }
 
@@ -215,6 +223,7 @@ public class HomeProgramService {
                         .instructionText(s.getInstructionText())
                         .childInstruction(s.getChildInstruction())
                         .audioPromptUrl(s.getAudioPromptUrl())
+                        .media(Collections.emptyList())
                         .build())
                 .collect(Collectors.toList());
 
@@ -225,6 +234,7 @@ public class HomeProgramService {
         String childLast = p.getChild() != null && p.getChild().getLastName() != null && !p.getChild().getLastName().isBlank()
                 ? " " + p.getChild().getLastName() : "";
         String childName = childFirst + childLast;
+        String childGender = p.getChild() != null && p.getChild().getGender() != null ? p.getChild().getGender() : "BOY";
         String promptLevelName = p.getTargetPromptLevel() != null ? p.getTargetPromptLevel().getLevelName() : "Visual Prompt";
         String actTitle = p.getActivity() != null ? p.getActivity().getTitle() : "ADL Activity";
 
@@ -232,6 +242,7 @@ public class HomeProgramService {
                 .id(p.getId())
                 .childId(p.getChild() != null ? p.getChild().getId() : null)
                 .childName(childName)
+                .childGender(childGender)
                 .therapistId(p.getTherapist() != null ? p.getTherapist().getId() : null)
                 .therapistName(therapistName)
                 .activityId(p.getActivity() != null ? p.getActivity().getId() : null)
