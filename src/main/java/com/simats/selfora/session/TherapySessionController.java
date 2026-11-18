@@ -36,6 +36,13 @@ public class TherapySessionController {
         return ResponseEntity.ok(sessionService.completeSession(id));
     }
 
+    @DeleteMapping("/{id}")
+    @PreAuthorize("hasAnyRole('THERAPIST', 'ADMIN', 'SUPER_ADMIN')")
+    public ResponseEntity<Void> cancelSession(@PathVariable Long id) {
+        sessionService.cancelSession(id);
+        return ResponseEntity.noContent().build();
+    }
+
     @GetMapping("/{id}")
     @PreAuthorize("hasAnyRole('THERAPIST', 'ADMIN', 'SUPER_ADMIN')")
     public ResponseEntity<SessionDtos.SessionResponse> getSessionById(@PathVariable Long id) {

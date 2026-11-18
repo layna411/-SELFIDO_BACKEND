@@ -272,6 +272,32 @@ public class TherapySessionService {
                 .build();
     }
 
+    @Transactional
+    public void cancelSession(Long sessionId) {
+        TherapySession session = sessionRepository.findById(sessionId).orElse(null);
+        if (session == null) {
+            return;
+        }
+        validateTherapistOrAdminAccess(session.getChild().getId());
+
+        // Only discard sessions that have NOT been completed yet
+        if (session.getEndTime() != null) {
+            return;
+        }
+
+        List<PerformanceRecord> records = performanceRecordRepository.findBySessionId(sessionId);
+        for (PerformanceRecord rec : records) {
+            List<GeneralizationRecord> genRecords = generalizationRecordRepository.findByPerformanceRecordId(rec.getId());
+            if (!genRecords.isEmpty()) {
+                generalizationRecordRepository.deleteAll(genRecords);
+            }
+        }
+        if (!records.isEmpty()) {
+            performanceRecordRepository.deleteAll(records);
+        }
+        sessionRepository.delete(session);
+    }
+
     public SessionDtos.SessionResponse getSessionById(Long id) {
         TherapySession session = sessionRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Session not found with ID: " + id));
@@ -284,6 +310,7 @@ public class TherapySessionService {
         validateTherapistOrAdminAccess(childId);
         List<TherapySession> sessions = sessionRepository.findByChildIdOrderByStartTimeDesc(childId);
         return sessions.stream()
+                .filter(s -> s.getEndTime() != null)
                 .map(s -> mapToSessionResponse(s, performanceRecordRepository.findBySessionId(s.getId())))
                 .collect(Collectors.toList());
     }
@@ -315,6 +342,7 @@ public class TherapySessionService {
         }
 
         return sessions.stream()
+                .filter(s -> s.getEndTime() != null)
                 .filter(s -> s.getChild() != null && (s.getChild().getIsActive() == null || Boolean.TRUE.equals(s.getChild().getIsActive())))
                 .map(s -> mapToSessionResponse(s, performanceRecordRepository.findBySessionId(s.getId())))
                 .collect(Collectors.toList());
@@ -359,7 +387,7 @@ public class TherapySessionService {
             } else if (completedSteps > 0 || unableSteps > 0) {
                 sessionOutcome = "PARTIAL";
             } else {
-                sessionOutcome = "COMPLETED";
+                sessionOutcome = "INCOMPLETE";
             }
         } else {
             sessionOutcome = "IN_PROGRESS";

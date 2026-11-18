@@ -105,7 +105,7 @@ public class TherapistService {
 
             Integer todaySess = jdbcTemplate.queryForObject(
                     "SELECT COUNT(DISTINCT ts.id) FROM therapy_sessions ts JOIN children c ON ts.child_id = c.id " +
-                    "WHERE (c.is_active = true OR c.is_active IS NULL) AND ts.start_time >= ? AND ts.start_time < ?",
+                    "WHERE (c.is_active = true OR c.is_active IS NULL) AND ts.end_time IS NOT NULL AND ts.start_time >= ? AND ts.start_time < ?",
                     Integer.class,
                     todayStart, todayEnd
             );
@@ -162,7 +162,7 @@ public class TherapistService {
                     "JOIN children c ON ts.child_id = c.id " +
                     "JOIN therapist_children tc ON c.id = tc.child_id " +
                     "WHERE tc.therapist_id = ? AND (c.is_active = true OR c.is_active IS NULL) " +
-                    "AND ts.start_time >= ? AND ts.start_time < ?",
+                    "AND ts.end_time IS NOT NULL AND ts.start_time >= ? AND ts.start_time < ?",
                     Integer.class,
                     therapist.getId(), todayStart, todayEnd
             );
@@ -201,6 +201,7 @@ public class TherapistService {
                             "JOIN children c ON ts.child_id = c.id " +
                             "LEFT JOIN activities a ON ts.activity_id = a.id " +
                             "WHERE (c.is_active = true OR c.is_active IS NULL) " +
+                            "AND ts.end_time IS NOT NULL " +
                             "AND ts.start_time >= ? AND ts.start_time < ? " +
                             "ORDER BY ts.start_time DESC",
                             todayStart, todayEnd
@@ -215,6 +216,7 @@ public class TherapistService {
                             "JOIN therapist_children tc ON c.id = tc.child_id " +
                             "LEFT JOIN activities a ON ts.activity_id = a.id " +
                             "WHERE tc.therapist_id = ? AND (c.is_active = true OR c.is_active IS NULL) " +
+                            "AND ts.end_time IS NOT NULL " +
                             "AND ts.start_time >= ? AND ts.start_time < ? " +
                             "ORDER BY ts.start_time DESC",
                             therapist.getId(), todayStart, todayEnd
@@ -468,7 +470,7 @@ public class TherapistService {
             String lastSessDate = "No recent session";
             try {
                 List<String> dates = jdbcTemplate.queryForList(
-                        "SELECT DATE_FORMAT(start_time, '%Y-%m-%d') FROM therapy_sessions WHERE child_id = ? ORDER BY start_time DESC LIMIT 1",
+                        "SELECT DATE_FORMAT(start_time, '%Y-%m-%d') FROM therapy_sessions WHERE child_id = ? AND end_time IS NOT NULL ORDER BY start_time DESC LIMIT 1",
                         String.class, c.getId()
                 );
                 if (!dates.isEmpty() && dates.get(0) != null) {
@@ -522,69 +524,85 @@ public class TherapistService {
     private String getCategoryWhereClause(String categoryKeyword) {
         String cat = categoryKeyword.toLowerCase();
         if (cat.contains("dress")) {
-            return "((a.category_id IN (1, 2, 3, 4)) OR (LOWER(a.title) NOT LIKE '%shoe%' AND LOWER(a.title) NOT LIKE '%sock%' AND LOWER(COALESCE(ac.name, '')) LIKE '%dressing%') OR LOWER(a.title) LIKE '%shirt%' OR LOWER(a.title) LIKE '%jacket%' OR LOWER(a.title) LIKE '%trouser%' OR LOWER(a.title) LIKE '%short%' OR LOWER(a.title) LIKE '%frock%' OR LOWER(a.title) LIKE '%vest%' OR LOWER(a.title) LIKE '%top%' OR LOWER(a.title) LIKE '%skirt%')";
+            return "((a.category_id IN (1, 2, 3, 4)) OR (LOWER(a.title) NOT LIKE '%shoe%' AND LOWER(a.title) NOT LIKE '%sock%' AND LOWER(COALESCE(ac.name, '')) LIKE '%dressing%') OR LOWER(a.title) LIKE '%shirt%' OR LOWER(a.title) LIKE '%jacket%' OR LOWER(a.title) LIKE '%trouser%' OR LOWER(a.title) LIKE '%short%' OR LOWER(a.title) LIKE '%frock%' OR LOWER(a.title) LIKE '%vest%' OR LOWER(a.title) LIKE '%top%' OR LOWER(a.title) LIKE '%skirt%' OR LOWER(a.title) LIKE '%brief%' OR LOWER(a.title) LIKE '%panties%' OR LOWER(a.title) LIKE '%camisole%' OR LOWER(a.title) LIKE '%dress%')";
         } else if (cat.contains("eat")) {
-            return "(a.category_id = 6 OR LOWER(COALESCE(ac.name, '')) LIKE '%eating%' OR LOWER(a.title) LIKE '%eat%' OR LOWER(a.title) LIKE '%spoon%' OR LOWER(a.title) LIKE '%rice%' OR LOWER(a.title) LIKE '%breakfast%')";
+            return "(a.category_id = 6 OR LOWER(COALESCE(ac.name, '')) LIKE '%eating%' OR LOWER(a.title) LIKE '%eat%' OR LOWER(a.title) LIKE '%spoon%' OR LOWER(a.title) LIKE '%rice%' OR LOWER(a.title) LIKE '%breakfast%' OR LOWER(a.title) LIKE '%food%' OR LOWER(a.title) LIKE '%drink%' OR LOWER(a.title) LIKE '%cup%')";
         } else { // Shoes & Socks
-            return "(a.category_id = 5 OR LOWER(a.title) LIKE '%shoe%' OR LOWER(a.title) LIKE '%sock%' OR LOWER(COALESCE(ac.sub_category, '')) LIKE '%footwear%')";
+            return "(a.category_id = 5 OR LOWER(a.title) LIKE '%shoe%' OR LOWER(a.title) LIKE '%sock%' OR LOWER(a.title) LIKE '%sandal%' OR LOWER(a.title) LIKE '%slipper%' OR LOWER(COALESCE(ac.sub_category, '')) LIKE '%footwear%')";
         }
     }
 
     private int calculateCategoryProgress(Long childId, String categoryKeyword) {
         String whereCat = getCategoryWhereClause(categoryKeyword);
         try {
-            // 1. Calculate from Therapy Sessions & Performance Records
-            Integer total = jdbcTemplate.queryForObject(
-                    "SELECT COUNT(pr.id) FROM performance_records pr " +
-                    "JOIN therapy_sessions ts ON pr.session_id = ts.id " +
+            // 1. Latest COMPLETED Therapy Session in this ADL category (matches ProgressAnalyticsService & Session Summary)
+            List<Long> latestSessionIds = jdbcTemplate.queryForList(
+                    "SELECT ts.id FROM therapy_sessions ts " +
                     "JOIN activities a ON ts.activity_id = a.id " +
                     "LEFT JOIN activity_categories ac ON a.category_id = ac.id " +
-                    "WHERE ts.child_id = ? AND " + whereCat + " " +
-                    "AND UPPER(COALESCE(pr.outcome, '')) != 'NOT_ASSESSED'",
-                    Integer.class,
+                    "WHERE ts.child_id = ? AND ts.end_time IS NOT NULL AND " + whereCat + " " +
+                    "AND EXISTS (SELECT 1 FROM performance_records pr WHERE pr.session_id = ts.id " +
+                    "AND UPPER(COALESCE(pr.outcome, '')) != 'NOT_ASSESSED' AND COALESCE(pr.prompt_level_id, 0) != 8) " +
+                    "ORDER BY ts.start_time DESC, ts.id DESC LIMIT 1",
+                    Long.class,
                     childId
             );
-            if (total != null && total > 0) {
-                Integer independent = jdbcTemplate.queryForObject(
+            if (!latestSessionIds.isEmpty()) {
+                Long latestSessionId = latestSessionIds.get(0);
+                Integer total = jdbcTemplate.queryForObject(
                         "SELECT COUNT(pr.id) FROM performance_records pr " +
-                        "JOIN therapy_sessions ts ON pr.session_id = ts.id " +
-                        "JOIN activities a ON ts.activity_id = a.id " +
-                        "LEFT JOIN activity_categories ac ON a.category_id = ac.id " +
-                        "WHERE ts.child_id = ? AND " + whereCat + " " +
-                        "AND pr.prompt_level_id = 0 AND UPPER(COALESCE(pr.outcome, '')) = 'COMPLETED'",
+                        "WHERE pr.session_id = ? " +
+                        "AND UPPER(COALESCE(pr.outcome, '')) != 'NOT_ASSESSED' AND COALESCE(pr.prompt_level_id, 0) != 8",
                         Integer.class,
-                        childId
+                        latestSessionId
                 );
-                int ind = independent != null ? independent : 0;
-                return (int) Math.round(((double) ind / total) * 100);
+                if (total != null && total > 0) {
+                    Integer independent = jdbcTemplate.queryForObject(
+                            "SELECT COUNT(pr.id) FROM performance_records pr " +
+                            "WHERE pr.session_id = ? " +
+                            "AND pr.prompt_level_id = 0 AND UPPER(COALESCE(pr.outcome, '')) = 'COMPLETED'",
+                            Integer.class,
+                            latestSessionId
+                    );
+                    int ind = independent != null ? independent : 0;
+                    return (int) Math.round(((double) ind / total) * 100.0);
+                }
             }
 
-            // 2. Fallback: Calculate from baseline clinical assessments
-            Integer assTotal = jdbcTemplate.queryForObject(
-                    "SELECT COUNT(ar.id) FROM assessment_results ar " +
-                    "JOIN assessments ass ON ar.assessment_id = ass.id " +
+            // 2. Fallback: Latest baseline clinical assessment in this category (excluding NOT_ASSESSED)
+            List<Long> latestAssessmentIds = jdbcTemplate.queryForList(
+                    "SELECT ass.id FROM assessments ass " +
                     "JOIN activities a ON ass.activity_id = a.id " +
                     "LEFT JOIN activity_categories ac ON a.category_id = ac.id " +
-                    "WHERE ass.child_id = ? AND " + whereCat,
-                    Integer.class,
+                    "WHERE ass.child_id = ? AND " + whereCat + " " +
+                    "ORDER BY ass.assessment_date DESC, ass.id DESC LIMIT 1",
+                    Long.class,
                     childId
             );
-            if (assTotal != null && assTotal > 0) {
-                Integer assInd = jdbcTemplate.queryForObject(
+            if (!latestAssessmentIds.isEmpty()) {
+                Long latestAssId = latestAssessmentIds.get(0);
+                Integer assTotal = jdbcTemplate.queryForObject(
                         "SELECT COUNT(ar.id) FROM assessment_results ar " +
-                        "JOIN assessments ass ON ar.assessment_id = ass.id " +
-                        "JOIN activities a ON ass.activity_id = a.id " +
-                        "LEFT JOIN activity_categories ac ON a.category_id = ac.id " +
-                        "WHERE ass.child_id = ? AND " + whereCat + " " +
-                        "AND ar.baseline_prompt_level_id = 0",
+                        "WHERE ar.assessment_id = ? " +
+                        "AND UPPER(COALESCE(ar.outcome, '')) != 'NOT_ASSESSED' AND COALESCE(ar.baseline_prompt_level_id, 0) != 8",
                         Integer.class,
-                        childId
+                        latestAssId
                 );
-                int ind = assInd != null ? assInd : 0;
-                return (int) Math.round(((double) ind / assTotal) * 100);
+                if (assTotal != null && assTotal > 0) {
+                    Integer assInd = jdbcTemplate.queryForObject(
+                            "SELECT COUNT(ar.id) FROM assessment_results ar " +
+                            "WHERE ar.assessment_id = ? " +
+                            "AND ar.baseline_prompt_level_id = 0 " +
+                            "AND UPPER(COALESCE(ar.outcome, 'COMPLETED')) NOT IN ('UNABLE', 'NOT_ASSESSED')",
+                            Integer.class,
+                            latestAssId
+                    );
+                    int ind = assInd != null ? assInd : 0;
+                    return (int) Math.round(((double) ind / assTotal) * 100.0);
+                }
             }
 
-            // 3. Fallback: Calculate from Child Mode recorded step progress
+            // 3. Fallback: Child Mode recorded progress in this category
             Integer capTotal = jdbcTemplate.queryForObject(
                     "SELECT COUNT(cap.id) FROM child_activity_progress cap " +
                     "JOIN activities a ON cap.activity_id = a.id " +
@@ -604,7 +622,7 @@ public class TherapistService {
                         childId
                 );
                 int ind = capCompleted != null ? capCompleted : 0;
-                return (int) Math.round(((double) ind / capTotal) * 100);
+                return (int) Math.round(((double) ind / capTotal) * 100.0);
             }
 
             return 0;

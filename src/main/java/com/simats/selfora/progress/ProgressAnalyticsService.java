@@ -39,6 +39,9 @@ public class ProgressAnalyticsService {
     private CaregiverPracticeSessionRepository caregiverPracticeSessionRepository;
 
     @Autowired
+    private ChildActivityProgressRepository childActivityProgressRepository;
+
+    @Autowired
     private ChildService childService;
 
     public ProgressDtos.ProgressSummaryResponse getProgressSummary(Long childId, Long activityId) {
@@ -50,7 +53,10 @@ public class ProgressAnalyticsService {
         Activity activity = activityRepository.findById(activityId)
                 .orElseThrow(() -> new ResourceNotFoundException("Activity not found with ID: " + activityId));
 
-        List<TherapySession> sessions = therapySessionRepository.findByChildIdAndActivityIdOrderByStartTimeDesc(childId, activityId);
+        List<TherapySession> sessions = therapySessionRepository.findByChildIdAndActivityIdOrderByStartTimeDesc(childId, activityId)
+                .stream()
+                .filter(s -> s.getEndTime() != null)
+                .collect(Collectors.toList());
         List<TaskStep> steps = taskStepRepository.findByActivityIdOrderByStepNumberAsc(activityId);
 
         List<PerformanceRecord> allRecords = performanceRecordRepository.findByChildId(childId).stream()
@@ -159,7 +165,10 @@ public class ProgressAnalyticsService {
         Activity activity = activityRepository.findById(activityId)
                 .orElseThrow(() -> new ResourceNotFoundException("Activity not found with ID: " + activityId));
 
-        List<TherapySession> sessions = therapySessionRepository.findByChildIdAndActivityIdOrderByStartTimeDesc(childId, activityId);
+        List<TherapySession> sessions = therapySessionRepository.findByChildIdAndActivityIdOrderByStartTimeDesc(childId, activityId)
+                .stream()
+                .filter(s -> s.getEndTime() != null)
+                .collect(Collectors.toList());
         List<Assessment> assessments = assessmentRepository.findByChildIdOrderByAssessmentDateDesc(childId);
 
         String latestAssessmentDate = assessments.size() > 0 ? assessments.get(0).getAssessmentDate().toString() : "Not Assessed";
@@ -230,7 +239,7 @@ public class ProgressAnalyticsService {
     private double calculateSessionIndependence(TherapySession session) {
         if (session == null) return 0.0;
         List<PerformanceRecord> records = performanceRecordRepository.findBySessionId(session.getId()).stream()
-                .filter(r -> !"NOT_ASSESSED".equalsIgnoreCase(r.getOutcome()))
+                .filter(r -> !"NOT_ASSESSED".equalsIgnoreCase(r.getOutcome()) && (r.getPromptLevel() == null || r.getPromptLevel().getId() != 8))
                 .collect(Collectors.toList());
 
         if (records.isEmpty()) return 0.0;
@@ -253,14 +262,16 @@ public class ProgressAnalyticsService {
                     || title.contains("shirt") || title.contains("jacket") || title.contains("trouser")
                     || title.contains("short") || title.contains("frock") || title.contains("vest")
                     || title.contains("top") || title.contains("skirt") || title.contains("brief")
-                    || title.contains("panties") || title.contains("camisole");
+                    || title.contains("panties") || title.contains("camisole") || title.contains("dress");
         } else if ("Eating".equalsIgnoreCase(catName)) {
             return (catId != null && catId == 6L) || catNameDb.contains("eating")
                     || title.contains("eat") || title.contains("spoon") || title.contains("rice")
-                    || title.contains("breakfast");
+                    || title.contains("breakfast") || title.contains("food")
+                    || title.contains("drink") || title.contains("cup");
         } else { // Shoes & Socks
             return (catId != null && catId == 5L)
                     || title.contains("shoe") || title.contains("sock")
+                    || title.contains("sandal") || title.contains("slipper")
                     || (activity.getCategory() != null && activity.getCategory().getSubCategory() != null
                     && activity.getCategory().getSubCategory().toLowerCase().contains("footwear"));
         }
@@ -270,10 +281,23 @@ public class ProgressAnalyticsService {
         if (assessment == null) return 0.0;
         List<com.simats.selfora.entity.AssessmentResult> results = assessmentResultRepository.findByAssessmentId(assessment.getId());
         if (results == null || results.isEmpty()) return 0.0;
-        long indCount = results.stream()
-                .filter(r -> r.getBaselinePromptLevel() != null && r.getBaselinePromptLevel().getId() == 0)
+        List<com.simats.selfora.entity.AssessmentResult> assessed = results.stream()
+                .filter(r -> !"NOT_ASSESSED".equalsIgnoreCase(r.getOutcome())
+                        && (r.getBaselinePromptLevel() == null || r.getBaselinePromptLevel().getId() != 8))
+                .collect(Collectors.toList());
+        if (assessed.isEmpty()) return 0.0;
+        long indCount = assessed.stream()
+                .filter(r -> r.getBaselinePromptLevel() != null && r.getBaselinePromptLevel().getId() == 0
+                        && !"UNABLE".equalsIgnoreCase(r.getOutcome()))
                 .count();
-        return ((double) indCount / results.size()) * 100.0;
+        return ((double) indCount / assessed.size()) * 100.0;
+    }
+
+    private boolean hasAssessedRecords(TherapySession session) {
+        if (session == null) return false;
+        return performanceRecordRepository.findBySessionId(session.getId()).stream()
+                .anyMatch(r -> !"NOT_ASSESSED".equalsIgnoreCase(r.getOutcome())
+                        && (r.getPromptLevel() == null || r.getPromptLevel().getId() != 8));
     }
 
     private List<ProgressDtos.ActivityPerformanceCardDto> buildActivityPerformanceCards(Long childId) {
@@ -284,13 +308,18 @@ public class ProgressAnalyticsService {
         categoryMap.put("Eating", "Eating");
         categoryMap.put("Shoes & Socks", "Shoes & Socks");
 
-        List<TherapySession> allSessions = therapySessionRepository.findByChildId(childId);
+        // Sort latest completed sessions FIRST to stay 100% synchronized with TherapistService.calculateCategoryProgress
+        List<TherapySession> allSessions = therapySessionRepository.findByChildIdOrderByStartTimeDesc(childId)
+                .stream()
+                .filter(s -> s.getEndTime() != null)
+                .collect(Collectors.toList());
         List<Assessment> allAssessments = assessmentRepository.findByChildIdOrderByAssessmentDateDesc(childId);
+        List<ChildActivityProgress> allChildProgress = childActivityProgressRepository.findByChildId(childId);
 
         for (Map.Entry<String, String> entry : categoryMap.entrySet()) {
             String cat = entry.getKey();
             List<TherapySession> sList = allSessions.stream()
-                    .filter(s -> isActivityInCategory(s.getActivity(), cat))
+                    .filter(s -> isActivityInCategory(s.getActivity(), cat) && hasAssessedRecords(s))
                     .collect(Collectors.toList());
 
             double curPct = 0.0;
@@ -299,28 +328,38 @@ public class ProgressAnalyticsService {
             int count = sList.size();
 
             if (!sList.isEmpty()) {
-                curPct = calculateSessionIndependence(sList.get(0));
+                curPct = Math.round(calculateSessionIndependence(sList.get(0)));
                 if (sList.size() > 1) {
-                    prevPct = calculateSessionIndependence(sList.get(1));
+                    prevPct = Math.round(calculateSessionIndependence(sList.get(1)));
                     trendStr = curPct > prevPct ? "IMPROVING" : (curPct < prevPct ? "REGRESSING" : "STABLE");
                 } else {
                     prevPct = 0.0;
                     trendStr = curPct > 0 ? "IMPROVING" : "STABLE";
                 }
             } else {
-                // Check if baseline clinical assessment exists for this category
+                // Tier 2: Latest baseline clinical assessment for this category
                 List<Assessment> catAssessments = allAssessments.stream()
                         .filter(a -> isActivityInCategory(a.getActivity(), cat))
                         .collect(Collectors.toList());
                 if (!catAssessments.isEmpty()) {
-                    curPct = calculateAssessmentIndependence(catAssessments.get(0));
+                    curPct = Math.round(calculateAssessmentIndependence(catAssessments.get(0)));
                     trendStr = "BASELINE";
                     count = catAssessments.size();
+                } else {
+                    // Tier 3: Child Mode recorded progress fallback (matches TherapistService)
+                    List<ChildActivityProgress> catCap = allChildProgress.stream()
+                            .filter(cap -> isActivityInCategory(cap.getActivity(), cat))
+                            .collect(Collectors.toList());
+                    if (!catCap.isEmpty()) {
+                        long completedCap = catCap.stream().filter(cap -> Boolean.TRUE.equals(cap.getIsCompleted())).count();
+                        curPct = Math.round(((double) completedCap / catCap.size()) * 100.0);
+                        trendStr = curPct > 0 ? "PRACTICING" : "STABLE";
+                    }
                 }
             }
 
             cards.add(new ProgressDtos.ActivityPerformanceCardDto(
-                    cat, Math.round(curPct * 10.0) / 10.0, Math.round(prevPct * 10.0) / 10.0, trendStr, count
+                    cat, (double) Math.round(curPct), (double) Math.round(prevPct), trendStr, count
             ));
         }
 
