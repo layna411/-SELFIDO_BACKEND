@@ -58,20 +58,14 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
                     String text = root.has("messageText") ? root.get("messageText").asText("") : "";
 
                     if (childId != null && !text.trim().isEmpty()) {
-                        User sender = userRepository.findById(userId).orElse(null);
-                        if (sender != null) {
-                            MessageDtos.SendMessageRequest req = new MessageDtos.SendMessageRequest(receiverId, childId, text.trim());
-                            messagingService.sendMessageAsUser(sender, req);
-                        }
+                        MessageDtos.SendMessageRequest req = new MessageDtos.SendMessageRequest(receiverId, childId, text.trim());
+                        messagingService.sendMessageAsUserId(userId, req);
                     }
                 }
                 case "MARK_READ" -> {
                     Long childId = root.has("childId") && !root.get("childId").isNull() ? root.get("childId").asLong() : null;
                     if (childId != null) {
-                        User currentUser = userRepository.findById(userId).orElse(null);
-                        if (currentUser != null) {
-                            messagingService.markConversationAsReadAsUser(currentUser, childId);
-                        }
+                        messagingService.markConversationAsReadAsUserId(userId, childId);
                     }
                 }
                 case "PING" -> {

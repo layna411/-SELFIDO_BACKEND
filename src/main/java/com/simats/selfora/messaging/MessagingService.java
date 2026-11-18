@@ -49,15 +49,49 @@ public class MessagingService {
     }
 
     @Transactional
+    public MessageDtos.MessageResponse sendMessageAsUserId(Long senderId, MessageDtos.SendMessageRequest request) {
+        if (senderId == null) {
+            throw new AccessDeniedException("Sender not authenticated");
+        }
+        User sender = userRepository.findById(senderId)
+                .orElseThrow(() -> new ResourceNotFoundException("Sender user not found"));
+        return sendMessageAsUser(sender, request);
+    }
+
+    private Long resolveChildIdForCaregiverIfNeeded(User user, Long requestedChildId) {
+        if (user == null) return requestedChildId;
+        boolean isCaregiver = user.getRoles().stream()
+                .anyMatch(r -> "ROLE_CAREGIVER".equalsIgnoreCase(r.getName()));
+        boolean isTherapistOrAdmin = user.getRoles().stream()
+                .anyMatch(r -> "ROLE_THERAPIST".equalsIgnoreCase(r.getName())
+                        || "ROLE_ADMIN".equalsIgnoreCase(r.getName())
+                        || "ROLE_SUPER_ADMIN".equalsIgnoreCase(r.getName()));
+        if (isCaregiver && !isTherapistOrAdmin) {
+            if (requestedChildId != null && requestedChildId > 0
+                    && childRepository.countByChildIdAndCaregiverId(requestedChildId, user.getId()) > 0) {
+                return requestedChildId;
+            }
+            List<Child> linked = childRepository.findByCaregiverId(user.getId());
+            if (!linked.isEmpty()) {
+                return linked.get(0).getId();
+            }
+        }
+        return requestedChildId;
+    }
+
+    @Transactional
     public MessageDtos.MessageResponse sendMessageAsUser(User sender, MessageDtos.SendMessageRequest request) {
         if (sender == null) {
             throw new AccessDeniedException("Sender not authenticated");
         }
-        if (request == null || request.getChildId() == null || request.getMessageText() == null || request.getMessageText().trim().isEmpty()) {
-            throw new IllegalArgumentException("childId and non-empty messageText are required");
+        if (request == null || request.getMessageText() == null || request.getMessageText().trim().isEmpty()) {
+            throw new IllegalArgumentException("Non-empty messageText is required");
         }
 
-        Long childId = request.getChildId();
+        Long childId = resolveChildIdForCaregiverIfNeeded(sender, request.getChildId());
+        if (childId == null || childId <= 0) {
+            throw new IllegalArgumentException("childId is required");
+        }
         validateAccessForUser(sender, childId);
 
         Child child = childRepository.findById(childId)
@@ -88,18 +122,24 @@ public class MessagingService {
 
     @Transactional
     public List<MessageDtos.MessageResponse> getConversationForChild(Long childId) {
-        if (childId != null) {
-            childService.validateChildAccessForCurrentUser(childId);
+        String username = SecurityContextHolder.getContext().getAuthentication().getName();
+        User currentUser = userRepository.findByUsername(username).orElse(null);
+        Long resolvedChildId = resolveChildIdForCaregiverIfNeeded(currentUser, childId);
+
+        if (resolvedChildId != null) {
+            childService.validateChildAccessForCurrentUser(resolvedChildId);
         }
-        List<Message> messages = messageRepository.findConversationByChildId(childId);
         try {
-            String username = SecurityContextHolder.getContext().getAuthentication().getName();
-            User currentUser = userRepository.findByUsername(username).orElse(null);
-            if (currentUser != null) {
-                markUnreadMessagesInternal(currentUser, childId, messages);
+            if (currentUser != null && resolvedChildId != null) {
+                int updatedCount = messageRepository.markUnreadAsRead(resolvedChildId, currentUser.getId());
+                if (updatedCount > 0) {
+                    Set<Long> participants = getAllParticipantUserIdsForChild(resolvedChildId);
+                    chatSessionRegistry.broadcastMessagesRead(resolvedChildId, currentUser.getId(), participants);
+                }
             }
         } catch (Exception ignored) {}
 
+        List<Message> messages = messageRepository.findConversationByChildId(resolvedChildId);
         return messages.stream().map(this::mapToResponse).collect(Collectors.toList());
     }
 
@@ -116,23 +156,20 @@ public class MessagingService {
     }
 
     @Transactional
+    public void markConversationAsReadAsUserId(Long userId, Long childId) {
+        if (userId == null || childId == null) return;
+        User currentUser = userRepository.findById(userId).orElse(null);
+        if (currentUser != null) {
+            markConversationAsReadAsUser(currentUser, childId);
+        }
+    }
+
+    @Transactional
     public void markConversationAsReadAsUser(User currentUser, Long childId) {
         if (currentUser == null || childId == null) return;
         validateAccessForUser(currentUser, childId);
-        List<Message> messages = messageRepository.findConversationByChildId(childId);
-        markUnreadMessagesInternal(currentUser, childId, messages);
-    }
-
-    private void markUnreadMessagesInternal(User currentUser, Long childId, List<Message> messages) {
-        boolean updated = false;
-        for (Message m : messages) {
-            if (m.getReceiver() != null && currentUser.getId().equals(m.getReceiver().getId()) && !Boolean.TRUE.equals(m.getIsRead())) {
-                m.setIsRead(true);
-                updated = true;
-            }
-        }
-        if (updated) {
-            messageRepository.saveAll(messages);
+        int updatedCount = messageRepository.markUnreadAsRead(childId, currentUser.getId());
+        if (updatedCount > 0) {
             Set<Long> participants = getAllParticipantUserIdsForChild(childId);
             chatSessionRegistry.broadcastMessagesRead(childId, currentUser.getId(), participants);
         }
@@ -142,9 +179,10 @@ public class MessagingService {
         String username = SecurityContextHolder.getContext().getAuthentication().getName();
         User currentUser = userRepository.findByUsername(username)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
-        validateAccessForUser(currentUser, childId);
+        Long resolvedChildId = resolveChildIdForCaregiverIfNeeded(currentUser, childId);
+        validateAccessForUser(currentUser, resolvedChildId);
 
-        Child child = childRepository.findById(childId)
+        Child child = childRepository.findById(resolvedChildId)
                 .orElseThrow(() -> new ResourceNotFoundException("Child not found"));
         String childName = child.getFirstName() + (child.getLastName() != null && !child.getLastName().isBlank() ? " " + child.getLastName() : "");
 
@@ -152,17 +190,17 @@ public class MessagingService {
                 .anyMatch(r -> "ROLE_CAREGIVER".equalsIgnoreCase(r.getName()));
 
         if (isCaregiver) {
-            User therapist = findAssignedTherapistForChild(childId);
+            User therapist = findAssignedTherapistForChild(resolvedChildId);
             if (therapist != null) {
-                return new MessageDtos.ChatPartnerResponse(therapist.getId(), therapist.getFullName(), "Occupational Therapist", childId, childName);
+                return new MessageDtos.ChatPartnerResponse(therapist.getId(), therapist.getFullName(), "Occupational Therapist", resolvedChildId, childName);
             }
         } else {
-            User caregiver = findLinkedCaregiverForChild(childId);
+            User caregiver = findLinkedCaregiverForChild(resolvedChildId);
             if (caregiver != null) {
-                return new MessageDtos.ChatPartnerResponse(caregiver.getId(), caregiver.getFullName(), "Caregiver", childId, childName);
+                return new MessageDtos.ChatPartnerResponse(caregiver.getId(), caregiver.getFullName(), "Caregiver", resolvedChildId, childName);
             }
         }
-        throw new ResourceNotFoundException("Chat partner not assigned for child ID: " + childId);
+        throw new ResourceNotFoundException("Chat partner not assigned for child ID: " + resolvedChildId);
     }
 
     private void validateAccessForUser(User user, Long childId) {
@@ -225,9 +263,9 @@ public class MessagingService {
             if (!ids.isEmpty()) {
                 return userRepository.findById(ids.get(0)).orElse(null);
             }
-            // Fallback to first therapist in system if not explicitly mapped
+            // Fallback to first therapist or admin in system if not explicitly mapped
             List<Long> fallbackIds = jdbcTemplate.queryForList(
-                    "SELECT u.id FROM users u JOIN user_roles ur ON u.id = ur.user_id JOIN roles r ON ur.role_id = r.id WHERE r.name = 'ROLE_THERAPIST' LIMIT 1",
+                    "SELECT u.id FROM users u JOIN user_roles ur ON u.id = ur.user_id JOIN roles r ON ur.role_id = r.id WHERE r.name IN ('ROLE_THERAPIST', 'ROLE_ADMIN', 'ROLE_SUPER_ADMIN') LIMIT 1",
                     Long.class
             );
             if (!fallbackIds.isEmpty()) {
